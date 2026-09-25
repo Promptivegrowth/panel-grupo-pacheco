@@ -1,0 +1,73 @@
+@import 'tailwindcss';
+
+/*
+ * Portal del Grupo Pacheco. Base sobria y neutra con el azul del grupo;
+ * dentro del panel de cada empresa, --marca toma el color de esa empresa.
+ */
+@theme {
+  --color-grupo: #082858;
+  --color-grupo-claro: #1d4a8c;
+  --color-tinta: #121611;
+  --color-tinta-2: #3d443b;
+  --color-tinta-3: #6b7369;
+  --color-linea: #e3e5e1;
+  --color-linea-2: #cfd3cc;
+  --color-fondo: #f5f6f4;
+
+  --color-ok: #1f7a3d;
+  --color-ok-fondo: #e6f4ea;
+  --color-aviso: #a15c00;
+  --color-aviso-fondo: #fdf1dd;
+  --color-peligro: #b42318;
+  --color-peligro-fondo: #fdecea;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+
+  --radius-caja: 14px;
+  --shadow-caja: 0 1px 2px rgb(18 22 17 / 0.05), 0 4px 16px rgb(18 22 17 / 0.05);
+}
+
+/*
+ * Con `inline`, las utilidades usan var(--marca) directamente, así que el
+ * valor que fija cada panel (style="--marca: …") llega a sus descendientes.
+ * Declarado en @theme normal se resolvería una sola vez en :root.
+ */
+@theme inline {
+  --color-marca: var(--marca);
+}
+
+:root {
+  --marca: #082858;
+}
+
+html {
+  background: var(--color-fondo);
+  color: var(--color-tinta);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-marca) 22%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-marca);
+  outline-offset: 2px;
+}
+
+/* Campos de formulario coherentes en todo el portal */
+@layer components {
+  .campo {
+    @apply w-full rounded-lg border border-linea-2 bg-white px-3 py-2 text-[15px] text-tinta shadow-[0_1px_0_rgb(18_22_17/0.03)] transition placeholder:text-tinta-3/70 focus:border-marca focus:outline-none focus:ring-3 focus:ring-marca/15 disabled:bg-fondo disabled:text-tinta-3;
+  }
+  .etiqueta {
+    @apply mb-1.5 block text-[13px] font-semibold text-tinta-2;
+  }
+  .caja {
+    @apply rounded-(--radius-caja) border border-linea bg-white shadow-caja;
+  }
+}
