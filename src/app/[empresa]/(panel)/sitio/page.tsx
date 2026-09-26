@@ -11,6 +11,7 @@ type Dato = {
   id: string;
   tipo: TipoDato;
   etiqueta: string;
+  etiqueta_en: string | null;
   valor: string;
   valor_en: string | null;
   detalle: string | null;
@@ -71,8 +72,16 @@ function Campos({ tipo, d, bilingue }: { tipo: TipoDato; d?: Dato; bilingue: boo
     case 'telefono':
     case 'correo':
       return (
-        <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
+        <div className={`grid gap-3 ${bilingue ? 'sm:grid-cols-[200px_200px_1fr]' : 'sm:grid-cols-[220px_1fr]'}`}>
           {et}
+          {bilingue && (
+            <div>
+              <label className="etiqueta" htmlFor={`${pref}-etiqueta_en`}>
+                Área (inglés)
+              </label>
+              <input id={`${pref}-etiqueta_en`} name="etiqueta_en" defaultValue={d?.etiqueta_en ?? ''} className="campo" maxLength={60} />
+            </div>
+          )}
           <div>
             <label className="etiqueta" htmlFor={`${pref}-valor`}>
               {tipo === 'telefono' ? 'Número' : 'Correo'}
@@ -231,7 +240,7 @@ export default async function DatosWeb({ params }: { params: Promise<{ empresa: 
   const sb = await supabaseServidor();
   const { data } = await sb
     .from('datos_contacto')
-    .select('id, tipo, etiqueta, valor, valor_en, detalle, red, orden, visible, actualizado')
+    .select('id, tipo, etiqueta, etiqueta_en, valor, valor_en, detalle, red, orden, visible, actualizado')
     .eq('empresa_id', empresa.id)
     .order('orden')
     .order('id');

@@ -26,6 +26,7 @@ const soloDigitos = (v: string) => v.replace(/[^\d]/g, '');
 /** Valida y normaliza el valor según el tipo de dato. */
 function validar(tipo: TipoDato, datos: FormData) {
   const etiqueta = String(datos.get('etiqueta') ?? '').trim().slice(0, 60);
+  const etiquetaEn = datos.has('etiqueta_en') ? String(datos.get('etiqueta_en') ?? '').trim().slice(0, 60) || null : undefined;
   const valorCrudo = String(datos.get('valor') ?? '').trim();
   const detalleCrudo = String(datos.get('detalle') ?? '').trim();
   const valorEn = String(datos.get('valor_en') ?? '').trim().slice(0, 200) || null;
@@ -42,13 +43,13 @@ function validar(tipo: TipoDato, datos: FormData) {
       const n = soloDigitos(valorCrudo);
       if (!/^\d{6,15}$/.test(n)) return { error: 'Número de teléfono no válido.' };
       if (!etiqueta) return { error: 'Indique a qué área corresponde el teléfono.' };
-      return { fila: { etiqueta, valor: n, visible } };
+      return { fila: { etiqueta, etiqueta_en: etiquetaEn, valor: n, visible } };
     }
     case 'correo': {
       const r = z.email().max(150).safeParse(valorCrudo.toLowerCase());
       if (!r.success) return { error: 'Correo electrónico no válido.' };
       if (!etiqueta) return { error: 'Indique a qué área corresponde el correo.' };
-      return { fila: { etiqueta, valor: r.data, visible } };
+      return { fila: { etiqueta, etiqueta_en: etiquetaEn, valor: r.data, visible } };
     }
     case 'direccion': {
       if (valorCrudo.length < 8) return { error: 'La dirección es demasiado corta.' };

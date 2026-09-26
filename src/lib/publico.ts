@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { supabaseServicio } from '@/lib/supabase/servicio';
 import type { Empresa } from '@/lib/reclamos/servicio';
+import { resolverUbigeo } from '@/lib/ubigeo';
 
 /**
  * Utilidades de la API pública que reciben las tres webs (estáticas, en
@@ -110,12 +111,14 @@ export const esquemaReclamo = z
     nombre: texto(3, 150),
     tipo_documento: z.enum(['DNI', 'CE', 'Pasaporte', 'RUC']),
     numero_documento: z.string().trim().regex(/^[A-Za-z0-9-]{6,15}$/, 'Número de documento no válido'),
-    domicilio: opcional(250),
+    domicilio: texto(5, 250),
+    ubigeo: z.string().trim().regex(/^\d{6}$/, 'Seleccione departamento, provincia y distrito'),
     telefono: opcional(30),
     correo: z.email().max(150),
     menor_edad: siNo.default(false),
     apoderado: opcional(150),
     bien_tipo: z.enum(['producto', 'servicio']),
+    moneda: z.enum(['PEN', 'USD']).default('PEN'),
     monto: z
       .union([z.number(), z.string()])
       .optional()
@@ -145,7 +148,12 @@ export const esquemaReclamo = z
     if (d.menor_edad && !d.apoderado) {
       ctx.addIssue({ code: 'custom', path: ['apoderado'], message: 'Indique el padre, madre o apoderado' });
     }
-  });
+    if (!resolverUbigeo(d.ubigeo)) {
+      ctx.addIssue({ code: 'custom', path: ['ubigeo'], message: 'El distrito seleccionado no es válido' });
+    }
+  })
+  // Los nombres salen del ubigeo del portal, no de lo que envíe el navegador.
+  .transform((d) => ({ ...d, ...resolverUbigeo(d.ubigeo)! }));
 
 export const esquemaMensaje = z
   .object({

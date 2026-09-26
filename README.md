@@ -45,13 +45,23 @@ web (estática) ──lee── Supabase REST (clave publicable, solo lo publica
 - Correos: constancia al consumidor (con el PDF), aviso interno y, al responder, la respuesta.
   Si el correo no está configurado, todo se guarda igual y se puede reenviar desde el reclamo.
 - Los reclamos no se pueden borrar desde el portal (registro legal).
+- El domicilio lleva ubigeo INEI (departamento, provincia y distrito). El portal valida
+  el código y resuelve los nombres en el servidor (`src/lib/ubigeo.ts`); el monto se
+  guarda con su moneda (PEN o USD).
+
+### Ubigeo
+
+`scripts/ubigeo.py` genera `src/lib/ubigeo-peru.json` (25 departamentos, 196 provincias,
+1892 distritos, INEI 2026) y copia el mismo archivo a `public/data/ubigeo-peru.json` de
+las tres webs, que lo usan para los selectores en cascada. Si el INEI crea un distrito,
+se añade en el script y se vuelve a ejecutar: portal y webs quedan siempre iguales.
 
 ## Desarrollo
 
 ```bash
 cp .env.example .env.local        # y completar
 npm install
-node scripts/migrar.mjs           # aplica supabase/migrations/ pendientes
+node scripts/migrar.mjs           # aplica supabase/migrations/ pendientes (0001–0005)
 npm run dev                       # http://localhost:3000
 ```
 

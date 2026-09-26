@@ -16,12 +16,15 @@ export type DatosHoja = {
   tipo_documento: string;
   numero_documento: string;
   domicilio: string | null;
+  /** «Distrito, Provincia, Departamento (ubigeo 000000)» */
+  ubicacion: string | null;
   telefono: string | null;
   correo: string;
   menor_edad: boolean;
   apoderado: string | null;
   bien_tipo: 'producto' | 'servicio';
   monto: number | null;
+  moneda: 'PEN' | 'USD';
   bien_descripcion: string;
   detalle: string;
   pedido: string;
@@ -238,6 +241,7 @@ export async function generarHoja(datos: DatosHoja): Promise<Uint8Array> {
   campo('Nombre completo', datos.nombre);
   campo('Documento de identidad', `${datos.tipo_documento} ${datos.numero_documento}`);
   campo('Domicilio', datos.domicilio ?? '');
+  if (datos.ubicacion) campo('Distrito, provincia y departamento', datos.ubicacion);
   campo('Teléfono', datos.telefono ?? '');
   campo('Correo electrónico', datos.correo);
   campo('Menor de edad', datos.menor_edad ? 'Sí' : 'No');
@@ -252,7 +256,9 @@ export async function generarHoja(datos: DatosHoja): Promise<Uint8Array> {
   y -= 20;
   campo(
     'Monto reclamado',
-    datos.monto != null ? `S/ ${datos.monto.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'No indicado',
+    datos.monto != null
+      ? `${datos.moneda === 'USD' ? 'US$' : 'S/'} ${datos.monto.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : 'No indicado',
   );
   bloque('Descripción', datos.bien_descripcion);
 

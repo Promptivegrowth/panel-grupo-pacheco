@@ -29,12 +29,17 @@ export type Reclamo = {
   tipo_documento: string;
   numero_documento: string;
   domicilio: string | null;
+  ubigeo: string | null;
+  departamento: string | null;
+  provincia: string | null;
+  distrito: string | null;
   telefono: string | null;
   correo: string;
   menor_edad: boolean;
   apoderado: string | null;
   bien_tipo: 'producto' | 'servicio';
   monto: number | null;
+  moneda: 'PEN' | 'USD';
   bien_descripcion: string;
   detalle: string;
   pedido: string;
@@ -56,12 +61,17 @@ export type NuevoReclamo = Pick<
   | 'tipo_documento'
   | 'numero_documento'
   | 'domicilio'
+  | 'ubigeo'
+  | 'departamento'
+  | 'provincia'
+  | 'distrito'
   | 'telefono'
   | 'correo'
   | 'menor_edad'
   | 'apoderado'
   | 'bien_tipo'
   | 'monto'
+  | 'moneda'
   | 'bien_descripcion'
   | 'detalle'
   | 'pedido'
@@ -91,12 +101,16 @@ function datosHoja(empresa: Empresa, r: Reclamo): DatosHoja {
     tipo_documento: r.tipo_documento,
     numero_documento: r.numero_documento,
     domicilio: r.domicilio,
+    ubicacion: r.distrito && r.provincia && r.departamento
+      ? `${r.distrito}, ${r.provincia}, ${r.departamento} (ubigeo ${r.ubigeo})`
+      : null,
     telefono: r.telefono,
     correo: r.correo,
     menor_edad: r.menor_edad,
     apoderado: r.apoderado,
     bien_tipo: r.bien_tipo,
     monto: r.monto == null ? null : Number(r.monto),
+    moneda: r.moneda ?? 'PEN',
     bien_descripcion: r.bien_descripcion,
     detalle: r.detalle,
     pedido: r.pedido,
@@ -170,6 +184,7 @@ async function enviarAviso(empresa: Empresa, r: Reclamo, pdf: Uint8Array) {
       filas: [
         ['Consumidor', r.nombre],
         ['Documento', `${r.tipo_documento} ${r.numero_documento}`],
+        ['Domicilio', [r.domicilio, r.distrito, r.provincia, r.departamento].filter(Boolean).join(', ')],
         ['Correo', r.correo],
         ['Teléfono', r.telefono ?? ''],
         ['Detalle', r.detalle],

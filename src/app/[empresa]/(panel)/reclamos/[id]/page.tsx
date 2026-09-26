@@ -86,7 +86,14 @@ export default async function DetalleReclamo({ params }: { params: Promise<{ emp
                 </a>
               </Dato>
               <Dato etiqueta="Teléfono">{r.telefono}</Dato>
-              <Dato etiqueta="Domicilio">{r.domicilio}</Dato>
+              <Dato etiqueta="Domicilio">
+                {r.domicilio}
+                {r.distrito && (
+                  <span className="block text-sm text-tinta-3">
+                    {r.distrito}, {r.provincia}, {r.departamento} · ubigeo {r.ubigeo}
+                  </span>
+                )}
+              </Dato>
               <Dato etiqueta="Menor de edad">{r.menor_edad ? `Sí · ${r.apoderado ?? ''}` : 'No'}</Dato>
             </dl>
           </Seccion>
@@ -95,7 +102,9 @@ export default async function DetalleReclamo({ params }: { params: Promise<{ emp
             <dl className="mb-4 grid gap-4 sm:grid-cols-2">
               <Dato etiqueta="Tipo">{r.bien_tipo === 'producto' ? 'Producto' : 'Servicio'}</Dato>
               <Dato etiqueta="Monto reclamado">
-                {r.monto != null ? `S/ ${Number(r.monto).toLocaleString('es-PE', { minimumFractionDigits: 2 })}` : 'No indicado'}
+                {r.monto != null
+                  ? `${r.moneda === 'USD' ? 'US$' : 'S/'} ${Number(r.monto).toLocaleString('es-PE', { minimumFractionDigits: 2 })}`
+                  : 'No indicado'}
               </Dato>
             </dl>
             <Texto etiqueta="Descripción">{r.bien_descripcion}</Texto>
