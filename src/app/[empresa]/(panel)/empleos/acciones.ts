@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { exigirAcceso } from '@/lib/sesion';
 import { supabaseServidor } from '@/lib/supabase/servidor';
 import type { EstadoAccion } from '@/componentes/formulario';
+import { borrarPostulaciones } from '@/lib/borrar-postulaciones';
 
 /** Vacantes de «Trabaja con nosotros». Roles: maestro y empleos (RLS). */
 
@@ -87,11 +88,48 @@ export async function alternarPublicacion(_: EstadoAccion, datos: FormData): Pro
   return null;
 }
 
+const plural = (n: number) => (n === 1 ? '1 postulación' : `${n} postulaciones`);
+
+/**
+ * Una vacante con postulaciones no se puede eliminar: primero hay que borrar
+ * sus postulaciones (la base de datos también lo impide).
+ */
 export async function eliminarEmpleo(_: EstadoAccion, datos: FormData): Promise<EstadoAccion> {
   const empresaId = String(datos.get('empresa') ?? '');
   await exigirAcceso(empresaId, 'empleos');
+  const id = String(datos.get('id') ?? '');
   const sb = await supabaseServidor();
-  const { error } = await sb.from('empleos').delete().eq('id', String(datos.get('id'))).eq('empresa_id', empresaId);
+
+  const { count } = await sb
+    .from('postulaciones')
+    .select('id', { count: 'exact', head: true })
+    .eq('empresa_id', empresaId)
+    .eq('empleo_id', id);
+  if (count) {
+    return {
+      ok: false,
+      tono: 'aviso',
+      mensaje: `Esta vacante tiene ${plural(count)}. Elimínelas primero con «Eliminar postulaciones» y después podrá eliminar la vacante.`,
+    };
+  }
+
+  const { error } = await sb.from('empleos').delete().eq('id', id).eq('empresa_id', empresaId);
   if (error) return { ok: false, mensaje: 'No se pudo eliminar la vacante.' };
-  redirect(`/${empresaId}/empleos`);
+  redirect(`/${empresaId}/empleos?eliminada=1`);
+}
+
+/** Borra todas las postulaciones de una vacante, con sus CV. */
+export async function eliminarPostulacionesDeEmpleo(_: EstadoAccion, datos: FormData): Promise<EstadoAccion> {
+  const empresaId = String(datos.get('empresa') ?? '');
+  await exigirAcceso(empresaId, 'postulaciones');
+  const sb = await supabaseServidor();
+  const r = await borrarPostulaciones(sb, empresaId, { empleoId: String(datos.get('id') ?? '') });
+  if (!r.ok) return { ok: false, mensaje: r.mensaje };
+  refresh();
+  return {
+    ok: true,
+    mensaje: r.borradas
+      ? `Se eliminaron ${plural(r.borradas)} con sus CV. Ya puede eliminar la vacante.`
+      : 'Esta vacante no tenía postulaciones.',
+  };
 }

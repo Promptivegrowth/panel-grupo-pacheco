@@ -4,7 +4,7 @@ import { supabaseServidor } from '@/lib/supabase/servidor';
 import { fechaLima, aISO } from '@/lib/reclamos/plazos';
 import { Aviso, Cabecera, EnlaceBoton, Insignia, Vacio, formatoFecha } from '@/componentes/ui';
 import { FormAccion, BotonEnviar } from '@/componentes/formulario';
-import { alternarPublicacion } from './acciones';
+import { alternarPublicacion, eliminarEmpleo, eliminarPostulacionesDeEmpleo } from './acciones';
 
 export const metadata = { title: 'Trabaja con nosotros' };
 
@@ -13,10 +13,11 @@ export default async function Empleos({
   searchParams,
 }: {
   params: Promise<{ empresa: string }>;
-  searchParams: Promise<{ creada?: string }>;
+  searchParams: Promise<{ creada?: string; eliminada?: string }>;
 }) {
-  const { empresa } = await exigirAcceso((await params).empresa, 'empleos');
-  const { creada } = await searchParams;
+  const { empresa, modulos } = await exigirAcceso((await params).empresa, 'empleos');
+  const { creada, eliminada } = await searchParams;
+  const verPostulaciones = modulos.includes('postulaciones');
   const sb = await supabaseServidor();
   const [{ data: empleos }, { data: postulaciones }] = await Promise.all([
     sb
@@ -47,9 +48,9 @@ export default async function Empleos({
         acciones={<EnlaceBoton href={`${base}/nuevo`}>+ Nueva vacante</EnlaceBoton>}
       />
 
-      {creada && (
+      {(creada || eliminada) && (
         <div className="mb-4">
-          <Aviso tono="ok">Vacante creada.</Aviso>
+          <Aviso tono="ok">{creada ? 'Vacante creada.' : 'Vacante eliminada.'}</Aviso>
         </div>
       )}
 
@@ -63,6 +64,14 @@ export default async function Empleos({
         <ul className="grid gap-4 md:grid-cols-2">
           {empleos.map((e) => {
             const cerrada = e.fecha_cierre && e.fecha_cierre < hoy;
+            const total = conteo.get(e.id)?.total ?? 0;
+            const nuevas = conteo.get(e.id)?.nuevas ?? 0;
+            const oculto = (
+              <>
+                <input type="hidden" name="empresa" value={empresa.id} />
+                <input type="hidden" name="id" value={e.id} />
+              </>
+            );
             return (
               <li key={e.id} className="caja flex flex-col p-5">
                 <div className="flex flex-wrap items-center gap-2">
@@ -83,23 +92,52 @@ export default async function Empleos({
                   Publicada el {formatoFecha(e.fecha_publicacion)}
                   {e.fecha_cierre && ` · cierra el ${formatoFecha(e.fecha_cierre)}`}
                 </p>
-                <Link
-                  href={`/${empresa.id}/postulaciones?filtro=todas&puesto=${encodeURIComponent(e.titulo)}`}
-                  className="mt-2 inline-flex w-fit items-center gap-2 text-sm font-semibold text-marca hover:underline"
-                >
-                  {conteo.get(e.id)?.total ?? 0} postulación(es)
-                  {!!conteo.get(e.id)?.nuevas && <Insignia tono="marca">{conteo.get(e.id)!.nuevas} nueva(s)</Insignia>}
-                </Link>
+                {/* Postulaciones de la vacante: ver y, para liberar espacio, borrarlas todas. */}
+                {verPostulaciones && (
+                  <FormAccion accion={eliminarPostulacionesDeEmpleo} className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1" claseAviso="mt-1 basis-full">
+                    {oculto}
+                    <Link
+                      href={`/${empresa.id}/postulaciones?filtro=todas&puesto=${encodeURIComponent(e.titulo)}`}
+                      className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-marca hover:underline"
+                    >
+                      {total === 1 ? '1 postulación' : `${total} postulaciones`}
+                      {!!nuevas && <Insignia tono="marca">{nuevas === 1 ? '1 nueva' : `${nuevas} nuevas`}</Insignia>}
+                    </Link>
+                    {total > 0 && (
+                      <BotonEnviar
+                        variante="peligro"
+                        className="px-2.5 py-1 text-xs"
+                        pendiente="Eliminando…"
+                        confirmar={`¿Eliminar ${total === 1 ? 'la postulación' : `las ${total} postulaciones`} de «${e.titulo}» y sus CV? No se puede deshacer.`}
+                      >
+                        Eliminar postulaciones
+                      </BotonEnviar>
+                    )}
+                  </FormAccion>
+                )}
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-linea pt-4">
                   <EnlaceBoton href={`${base}/${e.id}`} variante="secundario" className="py-1.5">
                     Editar
                   </EnlaceBoton>
                   <FormAccion accion={alternarPublicacion}>
-                    <input type="hidden" name="empresa" value={empresa.id} />
-                    <input type="hidden" name="id" value={e.id} />
+                    {oculto}
                     <input type="hidden" name="publicar" value={e.publicado ? '0' : '1'} />
                     <BotonEnviar variante="fantasma" className="py-1.5" pendiente="…">
                       {e.publicado ? 'Ocultar de la web' : 'Publicar'}
+                    </BotonEnviar>
+                  </FormAccion>
+                  {/* «contents»: el botón queda en la fila y el aviso baja a todo el ancho.
+                      La clave cambia con el total: el aviso de «tiene N postulaciones» se
+                      va en cuanto se borran. */}
+                  <FormAccion key={`eliminar-${total}`} accion={eliminarEmpleo} className="contents" claseAviso="basis-full">
+                    {oculto}
+                    <BotonEnviar
+                      variante="peligro"
+                      className="ml-auto py-1.5"
+                      pendiente="Eliminando…"
+                      confirmar={total ? undefined : `¿Eliminar la vacante «${e.titulo}»? No se puede deshacer.`}
+                    >
+                      Eliminar
                     </BotonEnviar>
                   </FormAccion>
                 </div>

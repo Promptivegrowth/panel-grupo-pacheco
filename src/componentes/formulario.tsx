@@ -47,11 +47,14 @@ export function FormAccion({
   accion,
   children,
   className = '',
+  claseAviso = 'mt-3',
   limpiarAlGuardar = false,
 }: {
   accion: (estado: EstadoAccion, datos: FormData) => Promise<EstadoAccion>;
   children: ReactNode;
   className?: string;
+  /** Clases del contenedor del aviso (p. ej. `basis-full` dentro de una fila flex). */
+  claseAviso?: string;
   limpiarAlGuardar?: boolean;
 }) {
   const [estado, ejecutar] = useActionState(accion, null);
@@ -65,7 +68,7 @@ export function FormAccion({
     <form ref={ref} action={ejecutar} className={className}>
       {children}
       {estado && (
-        <div className="mt-3">
+        <div className={claseAviso}>
           <Aviso tono={estado.tono ?? (estado.ok ? 'ok' : 'peligro')}>{estado.mensaje}</Aviso>
         </div>
       )}
