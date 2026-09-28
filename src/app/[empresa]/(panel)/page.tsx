@@ -14,7 +14,7 @@ export default async function Resumen({ params }: { params: Promise<{ empresa: s
   const sb = await supabaseServidor();
   const id = empresa.id;
 
-  const [pendientes, proximo, sinLeer, empleos, datos] = await Promise.all([
+  const [pendientes, proximo, sinLeer, empleos, datos, nuevas] = await Promise.all([
     modulos.includes('reclamos')
       ? sb.from('reclamos').select('id', { count: 'exact', head: true }).eq('empresa_id', id).neq('estado', 'respondido')
       : null,
@@ -28,12 +28,16 @@ export default async function Resumen({ params }: { params: Promise<{ empresa: s
       ? sb.from('empleos').select('id', { count: 'exact', head: true }).eq('empresa_id', id).eq('publicado', true)
       : null,
     modulos.includes('sitio') ? sb.from('datos_contacto').select('id', { count: 'exact', head: true }).eq('empresa_id', id) : null,
+    modulos.includes('postulaciones')
+      ? sb.from('postulaciones').select('id', { count: 'exact', head: true }).eq('empresa_id', id).eq('estado', 'nueva')
+      : null,
   ]);
 
   const tarjetas: { modulo: Modulo; valor: number; texto: string }[] = [];
   if (pendientes) tarjetas.push({ modulo: 'reclamos', valor: pendientes.count ?? 0, texto: 'por responder' });
   if (sinLeer) tarjetas.push({ modulo: 'mensajes', valor: sinLeer.count ?? 0, texto: 'sin leer' });
   if (empleos) tarjetas.push({ modulo: 'empleos', valor: empleos.count ?? 0, texto: 'vacantes publicadas' });
+  if (nuevas) tarjetas.push({ modulo: 'postulaciones', valor: nuevas.count ?? 0, texto: 'postulaciones nuevas' });
   if (datos) tarjetas.push({ modulo: 'sitio', valor: datos.count ?? 0, texto: 'datos editables' });
 
   const urgente = proximo?.data;
@@ -72,7 +76,7 @@ export default async function Resumen({ params }: { params: Promise<{ empresa: s
         </Link>
       )}
 
-      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
         {tarjetas.map((t) => (
           <li key={t.modulo}>
             <Link href={`/${id}/${t.modulo}`} className="caja group flex h-full flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-lg">

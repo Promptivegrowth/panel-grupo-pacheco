@@ -72,7 +72,7 @@ export function hashIp(req: Request): string | null {
 
 /** ¿Superó esta IP el máximo de envíos en la ventana de tiempo? */
 export async function excedeLimite(
-  tabla: 'mensajes' | 'reclamos',
+  tabla: 'mensajes' | 'reclamos' | 'postulaciones',
   ipHash: string | null,
   maximo: number,
   minutos = 10,
@@ -181,6 +181,70 @@ export const esquemaMensaje = z
       ),
   })
   .refine((d) => d.correo || d.telefono, { message: 'Indique un correo o un teléfono', path: ['correo'] });
+
+// ------------------------------------------------------------ postulaciones
+
+/** Opciones de los desplegables del formulario de postulación (web y portal). */
+export const ESTUDIOS = [
+  'Secundaria completa',
+  'Técnico',
+  'Universitario en curso',
+  'Bachiller',
+  'Titulado',
+  'Titulado y colegiado',
+] as const;
+export const EXPERIENCIA = ['Sin experiencia', 'Menos de 1 año', 'De 1 a 2 años', 'De 3 a 5 años', 'Más de 5 años'] as const;
+export const DISPONIBILIDAD = ['Inmediata', 'En 15 días', 'En 30 días', 'Más de 30 días'] as const;
+
+export const esquemaPostulacion = z
+  .object({
+    empleo_id: z
+      .string()
+      .trim()
+      .optional()
+      .transform((v) => (v && /^[0-9a-f-]{36}$/i.test(v) ? v : null)),
+    // Título de la vacante tal como se mostró (respaldo si la vacante ya no existe).
+    puesto: opcional(150),
+    area_interes: opcional(150),
+    nombre: texto(3, 150),
+    tipo_documento: z.enum(['DNI', 'CE', 'Pasaporte']),
+    numero_documento: z.string().trim().regex(/^[A-Za-z0-9-]{6,15}$/, 'Número de documento no válido'),
+    correo: z.email().max(150),
+    telefono: z.string().trim().regex(/^[+\d\s()-]{6,20}$/, 'Teléfono no válido'),
+    ubigeo: z.string().trim().regex(/^\d{6}$/, 'Seleccione departamento, provincia y distrito'),
+    estudios: z.enum(ESTUDIOS, 'Seleccione su nivel de estudios'),
+    carrera: opcional(150),
+    experiencia: z.enum(EXPERIENCIA, 'Seleccione sus años de experiencia'),
+    experiencia_bpm: siNo.default(false),
+    disponibilidad: z.enum(DISPONIBILIDAD, 'Seleccione su disponibilidad'),
+    pretension: z
+      .union([z.number(), z.string()])
+      .optional()
+      .transform((v, ctx) => {
+        if (v === undefined || v === '') return null;
+        const n = typeof v === 'number' ? v : Number(String(v).replace(/[^\d.,]/g, '').replace(',', '.'));
+        if (!Number.isFinite(n) || n < 0 || n > 1e7) {
+          ctx.addIssue({ code: 'custom', message: 'Pretensión salarial no válida' });
+          return z.NEVER;
+        }
+        return Math.round(n * 100) / 100;
+      }),
+    linkedin: z
+      .union([z.url({ protocol: /^https?$/ }).max(300), z.literal('')])
+      .optional()
+      .transform((v) => (v ? v : null)),
+    presentacion: opcional(1500),
+    acepta: siNo.default(false).refine((v) => v, 'Debe autorizar el tratamiento de sus datos personales.'),
+  })
+  .superRefine((d, ctx) => {
+    if (d.tipo_documento === 'DNI' && !/^\d{8}$/.test(d.numero_documento)) {
+      ctx.addIssue({ code: 'custom', path: ['numero_documento'], message: 'El DNI tiene 8 dígitos' });
+    }
+    if (!resolverUbigeo(d.ubigeo)) {
+      ctx.addIssue({ code: 'custom', path: ['ubigeo'], message: 'El distrito seleccionado no es válido' });
+    }
+  })
+  .transform((d) => ({ ...d, ...resolverUbigeo(d.ubigeo)! }));
 
 /** Primer error legible de zod, para devolverlo al formulario. */
 export function primerError(error: z.ZodError): { campo: string; mensaje: string } {

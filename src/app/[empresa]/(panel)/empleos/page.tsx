@@ -18,12 +18,23 @@ export default async function Empleos({
   const { empresa } = await exigirAcceso((await params).empresa, 'empleos');
   const { creada } = await searchParams;
   const sb = await supabaseServidor();
-  const { data: empleos } = await sb
-    .from('empleos')
-    .select('id, titulo, area, ubicacion, modalidad, jornada, publicado, fecha_publicacion, fecha_cierre, actualizado')
-    .eq('empresa_id', empresa.id)
-    .order('publicado', { ascending: false })
-    .order('fecha_publicacion', { ascending: false });
+  const [{ data: empleos }, { data: postulaciones }] = await Promise.all([
+    sb
+      .from('empleos')
+      .select('id, titulo, area, ubicacion, modalidad, jornada, publicado, fecha_publicacion, fecha_cierre, actualizado')
+      .eq('empresa_id', empresa.id)
+      .order('publicado', { ascending: false })
+      .order('fecha_publicacion', { ascending: false }),
+    sb.from('postulaciones').select('empleo_id, estado').eq('empresa_id', empresa.id).not('empleo_id', 'is', null),
+  ]);
+  // Postulaciones por vacante: total y nuevas.
+  const conteo = new Map<string, { total: number; nuevas: number }>();
+  for (const p of postulaciones ?? []) {
+    const c = conteo.get(p.empleo_id!) ?? { total: 0, nuevas: 0 };
+    c.total += 1;
+    if (p.estado === 'nueva') c.nuevas += 1;
+    conteo.set(p.empleo_id!, c);
+  }
 
   const hoy = aISO(fechaLima());
   const base = `/${empresa.id}/empleos`;
@@ -72,6 +83,13 @@ export default async function Empleos({
                   Publicada el {formatoFecha(e.fecha_publicacion)}
                   {e.fecha_cierre && ` · cierra el ${formatoFecha(e.fecha_cierre)}`}
                 </p>
+                <Link
+                  href={`/${empresa.id}/postulaciones?filtro=todas&puesto=${encodeURIComponent(e.titulo)}`}
+                  className="mt-2 inline-flex w-fit items-center gap-2 text-sm font-semibold text-marca hover:underline"
+                >
+                  {conteo.get(e.id)?.total ?? 0} postulación(es)
+                  {!!conteo.get(e.id)?.nuevas && <Insignia tono="marca">{conteo.get(e.id)!.nuevas} nueva(s)</Insignia>}
+                </Link>
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-linea pt-4">
                   <EnlaceBoton href={`${base}/${e.id}`} variante="secundario" className="py-1.5">
                     Editar

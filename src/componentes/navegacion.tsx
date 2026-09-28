@@ -32,6 +32,12 @@ const ICONOS: Record<string, ReactNode> = {
       <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3 12.5h18" />
     </>
   ),
+  postulaciones: (
+    <>
+      <circle cx="10" cy="8" r="3.5" />
+      <path d="M3.5 20c.6-3.6 3.2-5.5 6.5-5.5 1.4 0 2.7.3 3.7 1M16 19.5l2 2 3.5-4" />
+    </>
+  ),
 };
 
 export function Icono({ nombre, className = 'size-[18px]' }: { nombre: string; className?: string }) {

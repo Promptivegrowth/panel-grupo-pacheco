@@ -4,7 +4,7 @@
  * lo que necesita la interfaz y que no cambia desde el panel.
  */
 
-export type Modulo = 'reclamos' | 'mensajes' | 'sitio' | 'empleos';
+export type Modulo = 'reclamos' | 'mensajes' | 'sitio' | 'empleos' | 'postulaciones';
 
 export type EmpresaUI = {
   id: 'lp' | 'qmedical' | 'woli';
@@ -31,7 +31,7 @@ export const EMPRESAS: Record<EmpresaUI['id'], EmpresaUI> = {
     color: '#6d9633',
     prefijo: 'LP',
     bilingue: false,
-    modulos: ['reclamos', 'mensajes', 'sitio', 'empleos'],
+    modulos: ['reclamos', 'mensajes', 'sitio', 'empleos', 'postulaciones'],
   },
   qmedical: {
     id: 'qmedical',
@@ -68,7 +68,7 @@ export type Rol = 'maestro' | 'empleos';
 /** Qué módulos ve cada rol (además de los que tenga activos la empresa). */
 export function modulosPara(empresa: EmpresaUI, rol: Rol): Modulo[] {
   if (rol === 'maestro') return empresa.modulos;
-  return empresa.modulos.filter((m) => m === 'empleos');
+  return empresa.modulos.filter((m) => m === 'empleos' || m === 'postulaciones');
 }
 
 export const NOMBRE_MODULO: Record<Modulo, string> = {
@@ -76,4 +76,5 @@ export const NOMBRE_MODULO: Record<Modulo, string> = {
   mensajes: 'Mensajes de contacto',
   sitio: 'Datos de la web',
   empleos: 'Trabaja con nosotros',
+  postulaciones: 'Postulaciones',
 };

@@ -17,14 +17,22 @@ export default async function LayoutPanel({
   const sb = await supabaseServidor();
 
   // Contadores de pendientes para la barra lateral (la RLS limita lo visible).
-  const [reclamos, mensajes] = await Promise.all([
+  const [reclamos, mensajes, postulaciones] = await Promise.all([
     modulos.includes('reclamos')
       ? sb.from('reclamos').select('id', { count: 'exact', head: true }).eq('empresa_id', empresa.id).neq('estado', 'respondido')
       : null,
     modulos.includes('mensajes')
       ? sb.from('mensajes').select('id', { count: 'exact', head: true }).eq('empresa_id', empresa.id).eq('leido', false).eq('archivado', false)
       : null,
+    modulos.includes('postulaciones')
+      ? sb.from('postulaciones').select('id', { count: 'exact', head: true }).eq('empresa_id', empresa.id).eq('estado', 'nueva')
+      : null,
   ]);
+  const contadores: Partial<Record<string, number>> = {
+    reclamos: reclamos?.count ?? 0,
+    mensajes: mensajes?.count ?? 0,
+    postulaciones: postulaciones?.count ?? 0,
+  };
 
   const base = `/${empresa.id}`;
   const items: ItemNav[] = [
@@ -33,7 +41,7 @@ export default async function LayoutPanel({
       href: `${base}/${m}`,
       texto: NOMBRE_MODULO[m],
       icono: m,
-      contador: m === 'reclamos' ? (reclamos?.count ?? 0) : m === 'mensajes' ? (mensajes?.count ?? 0) : undefined,
+      contador: contadores[m],
     })),
   ];
 

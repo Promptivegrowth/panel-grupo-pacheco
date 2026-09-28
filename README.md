@@ -9,11 +9,12 @@ Se elige la empresa, se ingresa con el usuario correspondiente y se gestiona:
 | Mensajes de contacto | Lo que llega por los formularios de contacto y cotización | Las tres |
 | Datos de la web | WhatsApp, teléfonos, correos, dirección, horario y redes; se ven en la web al recargar | Las tres |
 | Trabaja con nosotros | Vacantes publicadas en la web | Laboratorios Pacheco |
+| Postulaciones | Postulaciones con CV desde el botón «Postular»: estado, notas, descarga y borrado | Laboratorios Pacheco |
 
 ## Roles
 
 - **maestro** — todos los módulos de las empresas asignadas.
-- **empleos** — solo «Trabaja con nosotros».
+- **empleos** — solo «Trabaja con nosotros» y «Postulaciones».
 
 Los permisos se aplican en tres capas: el proxy exige sesión, cada página y acción
 comprueba empresa y rol (`src/lib/sesion.ts`) y, al final, la base de datos los
@@ -26,7 +27,7 @@ Las tres webs son estáticas (Vercel o cPanel) y hablan con este portal y con Su
 ```
 web (estática) ──lee── Supabase REST (clave publicable, solo lo publicado)
       │
-      └─envía─▶ portal /api/publico/{empresa}/reclamo | contacto
+      └─envía─▶ portal /api/publico/{empresa}/reclamo | contacto | postulacion
                    └─ valida, numera, genera el PDF, guarda y envía los correos
 ```
 
@@ -49,6 +50,15 @@ web (estática) ──lee── Supabase REST (clave publicable, solo lo publica
   el código y resuelve los nombres en el servidor (`src/lib/ubigeo.ts`); el monto se
   guarda con su moneda (PEN o USD).
 
+## Postulaciones
+
+- `POST /api/publico/{empresa}/postulacion` (multipart) con el CV en el campo `cv`: PDF o Word,
+  hasta 4 MB (el cuerpo de una función de Vercel admite 4,5 MB). El tipo se comprueba por la
+  firma del archivo, no por la extensión. Sin `empleo_id` es una postulación espontánea.
+- El CV va al bucket privado `postulaciones`; el portal lo muestra con enlaces firmados de 10 minutos.
+- Avisos: al correo de postulación de la vacante (con el CV adjunto) y un acuse al postulante.
+- Máximo 5 postulaciones cada 10 minutos por IP.
+
 ### Ubigeo
 
 `scripts/ubigeo.py` genera `src/lib/ubigeo-peru.json` (25 departamentos, 196 provincias,
@@ -61,7 +71,7 @@ se añade en el script y se vuelve a ejecutar: portal y webs quedan siempre igua
 ```bash
 cp .env.example .env.local        # y completar
 npm install
-node scripts/migrar.mjs           # aplica supabase/migrations/ pendientes (0001–0005)
+node scripts/migrar.mjs           # aplica supabase/migrations/ pendientes (0001–0006)
 npm run dev                       # http://localhost:3000
 ```
 
