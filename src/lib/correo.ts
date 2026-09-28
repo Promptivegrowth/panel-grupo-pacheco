@@ -59,6 +59,27 @@ export function correoConfigurado(empresaId: string): boolean {
   return configDe(empresaId) !== null;
 }
 
+/**
+ * Diagnóstico para el panel (sin revelar valores): si la variable no existe,
+ * no es JSON o le faltan campos.
+ */
+export function estadoCorreo(empresaId: string): { ok: true } | { ok: false; motivo: string } {
+  const nombre = `CORREO_${empresaId.toUpperCase()}`;
+  const bruto = process.env[nombre];
+  if (!bruto?.trim()) return { ok: false, motivo: `No existe la variable ${nombre} en este entorno.` };
+  let c: Record<string, unknown>;
+  try {
+    c = JSON.parse(bruto);
+  } catch {
+    return { ok: false, motivo: `La variable ${nombre} existe, pero no es un JSON válido (revise comillas y llaves).` };
+  }
+  const requeridos = c.tipo === 'smtp' ? ['host', 'usuario', 'clave', 'remitente'] : c.tipo === 'resend' ? ['clave', 'remitente'] : null;
+  if (!requeridos) return { ok: false, motivo: `En ${nombre}, «tipo» debe ser "smtp" o "resend".` };
+  const faltan = requeridos.filter((k) => typeof c[k] !== 'string' || !(c[k] as string).trim());
+  if (faltan.length) return { ok: false, motivo: `En ${nombre} faltan: ${faltan.join(', ')}.` };
+  return { ok: true };
+}
+
 export async function enviarCorreo(empresaId: string, m: Mensaje): Promise<Resultado> {
   const config = configDe(empresaId);
   if (!config) return { enviado: false, motivo: 'El envío de correo aún no está configurado para esta empresa.' };

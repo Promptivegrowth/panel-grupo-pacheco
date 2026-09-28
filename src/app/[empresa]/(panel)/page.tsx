@@ -3,7 +3,7 @@ import { exigirAcceso } from '@/lib/sesion';
 import { supabaseServidor } from '@/lib/supabase/servidor';
 import { NOMBRE_MODULO, type Modulo } from '@/lib/empresas';
 import { habilesRestantes } from '@/lib/reclamos/plazos';
-import { correoConfigurado } from '@/lib/correo';
+import { estadoCorreo } from '@/lib/correo';
 import { Aviso, Cabecera, formatoFecha } from '@/componentes/ui';
 import { Icono } from '@/componentes/navegacion';
 
@@ -40,6 +40,7 @@ export default async function Resumen({ params }: { params: Promise<{ empresa: s
   if (nuevas) tarjetas.push({ modulo: 'postulaciones', valor: nuevas.count ?? 0, texto: 'postulaciones nuevas' });
   if (datos) tarjetas.push({ modulo: 'sitio', valor: datos.count ?? 0, texto: 'datos editables' });
 
+  const correo = estadoCorreo(id);
   const urgente = proximo?.data;
   const dias = urgente ? habilesRestantes(new Date(`${urgente.vence}T00:00:00Z`)) : null;
 
@@ -47,11 +48,11 @@ export default async function Resumen({ params }: { params: Promise<{ empresa: s
     <>
       <Cabecera titulo={`Hola, ${usuario.correo.split('@')[0]}`} descripcion={`Resumen de ${empresa.nombre}.`} />
 
-      {modulos.includes('reclamos') && !correoConfigurado(id) && (
+      {modulos.includes('reclamos') && !correo.ok && (
         <div className="mb-6">
           <Aviso tono="aviso">
-            El envío de correos aún no está configurado para {empresa.nombre}. Los reclamos y mensajes se guardan
-            igual y podrá reenviar las constancias desde cada reclamo cuando se configure.
+            El envío de correos aún no está configurado para {empresa.nombre}: {correo.motivo} Los reclamos y
+            mensajes se guardan igual y podrá reenviar las constancias desde cada reclamo cuando se configure.
           </Aviso>
         </div>
       )}
