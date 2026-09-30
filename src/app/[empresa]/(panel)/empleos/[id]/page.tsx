@@ -15,6 +15,7 @@ type Empleo = {
   modalidad: string;
   jornada: string;
   resumen: string;
+  reporta_a: string | null;
   requisitos: string[];
   funciones: string[];
   beneficios: string[];
@@ -62,7 +63,7 @@ export default async function EditarEmpleo({ params }: { params: Promise<{ empre
       <Cabecera
         volver={{ href: `/${empresa.id}/empleos`, texto: 'Trabaja con nosotros' }}
         titulo={e ? 'Editar vacante' : 'Nueva vacante'}
-        descripcion="Escriba cada requisito, función o beneficio en una línea: en la web se muestran como lista."
+        descripcion="Escriba cada responsabilidad, requisito o beneficio en una línea: en la web se muestran como lista."
       />
 
       <FormAccion accion={guardarEmpleo} className="caja space-y-5 p-5 sm:p-6">
@@ -119,9 +120,17 @@ export default async function EditarEmpleo({ params }: { params: Promise<{ empre
           <textarea id="resumen" name="resumen" rows={3} defaultValue={e?.resumen} className="campo resize-y" required minLength={20} maxLength={600} />
         </div>
 
+        <div className="sm:w-1/2">
+          <label htmlFor="reporta_a" className="etiqueta">
+            Reporta a
+          </label>
+          <input id="reporta_a" name="reporta_a" defaultValue={e?.reporta_a ?? ''} className="campo" maxLength={120} placeholder="Jefe de Producción" />
+          <p className="mt-1 text-xs text-tinta-3">Opcional. Según el MOF del puesto.</p>
+        </div>
+
         <div className="grid gap-4 lg:grid-cols-3">
+          <Lista nombre="funciones" titulo="Responsabilidades" ayuda="Una por línea. Opcional." valor={e?.funciones} />
           <Lista nombre="requisitos" titulo="Requisitos" ayuda="Uno por línea. Obligatorio." valor={e?.requisitos} requerido />
-          <Lista nombre="funciones" titulo="Funciones" ayuda="Uno por línea. Opcional." valor={e?.funciones} />
           <Lista nombre="beneficios" titulo="Beneficios" ayuda="Uno por línea. Opcional." valor={e?.beneficios} />
         </div>
 

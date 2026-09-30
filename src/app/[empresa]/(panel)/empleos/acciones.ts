@@ -29,6 +29,7 @@ const esquema = z.object({
   modalidad: z.enum(['Presencial', 'Híbrido', 'Remoto']),
   jornada: z.enum(['Tiempo completo', 'Medio tiempo', 'Por turnos', 'Prácticas']),
   resumen: z.string().trim().min(20, 'El resumen debe tener al menos 20 caracteres.').max(600),
+  reporta_a: z.string().trim().max(120).transform((v) => v || null),
   requisitos: lineas(15),
   funciones: lineas(15),
   beneficios: lineas(12),
@@ -46,7 +47,7 @@ export async function guardarEmpleo(_: EstadoAccion, datos: FormData): Promise<E
 
   const r = esquema.safeParse({
     ...Object.fromEntries(
-      ['titulo', 'area', 'ubicacion', 'modalidad', 'jornada', 'resumen', 'requisitos', 'funciones', 'beneficios', 'correo_postulacion', 'fecha_cierre'].map(
+      ['titulo', 'area', 'ubicacion', 'modalidad', 'jornada', 'resumen', 'reporta_a', 'requisitos', 'funciones', 'beneficios', 'correo_postulacion', 'fecha_cierre'].map(
         (k) => [k, String(datos.get(k) ?? '')],
       ),
     ),
