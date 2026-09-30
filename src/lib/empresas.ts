@@ -18,6 +18,8 @@ export type EmpresaUI = {
   prefijo: string;
   /** La web tiene versión en inglés: algunos textos llevan traducción. */
   bilingue: boolean;
+  /** La web elige dónde mostrar cada teléfono y correo (pie / contacto por área). */
+  ubicacionesDatos?: boolean;
   modulos: Modulo[];
 };
 
@@ -31,6 +33,7 @@ export const EMPRESAS: Record<EmpresaUI['id'], EmpresaUI> = {
     color: '#6d9633',
     prefijo: 'LP',
     bilingue: false,
+    ubicacionesDatos: true,
     modulos: ['reclamos', 'mensajes', 'sitio', 'empleos', 'postulaciones'],
   },
   qmedical: {

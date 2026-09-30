@@ -31,6 +31,9 @@ function validar(tipo: TipoDato, datos: FormData) {
   const detalleCrudo = String(datos.get('detalle') ?? '').trim();
   const valorEn = String(datos.get('valor_en') ?? '').trim().slice(0, 200) || null;
   const visible = datos.get('visible') === 'on';
+  // Dónde se muestra (solo si el formulario trae esas casillas).
+  const lugares = datos.getAll('mostrar_en').map(String).filter((l) => l === 'pie' || l === 'contacto');
+  const mostrarEn = datos.has('mostrar_en_campo') ? { mostrar_en: lugares } : {};
 
   switch (tipo) {
     case 'whatsapp': {
@@ -43,13 +46,13 @@ function validar(tipo: TipoDato, datos: FormData) {
       const n = soloDigitos(valorCrudo);
       if (!/^\d{6,15}$/.test(n)) return { error: 'Número de teléfono no válido.' };
       if (!etiqueta) return { error: 'Indique a qué área corresponde el teléfono.' };
-      return { fila: { etiqueta, etiqueta_en: etiquetaEn, valor: n, visible } };
+      return { fila: { etiqueta, etiqueta_en: etiquetaEn, valor: n, visible, ...mostrarEn } };
     }
     case 'correo': {
       const r = z.email().max(150).safeParse(valorCrudo.toLowerCase());
       if (!r.success) return { error: 'Correo electrónico no válido.' };
       if (!etiqueta) return { error: 'Indique a qué área corresponde el correo.' };
-      return { fila: { etiqueta, etiqueta_en: etiquetaEn, valor: r.data, visible } };
+      return { fila: { etiqueta, etiqueta_en: etiquetaEn, valor: r.data, visible, ...mostrarEn } };
     }
     case 'direccion': {
       if (valorCrudo.length < 8) return { error: 'La dirección es demasiado corta.' };

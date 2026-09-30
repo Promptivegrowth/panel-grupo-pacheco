@@ -18,6 +18,7 @@ type Dato = {
   red: string | null;
   orden: number;
   visible: boolean;
+  mostrar_en: string[];
   actualizado: string;
 };
 
@@ -166,6 +167,31 @@ function Campos({ tipo, d, bilingue }: { tipo: TipoDato; d?: Dato; bilingue: boo
   }
 }
 
+/**
+ * Dónde se muestra un teléfono o correo (webs con `ubicacionesDatos`). Los
+ * correos solo aparecen en «Contacto por área»; los teléfonos, también en el pie.
+ */
+function MostrarEn({ pref, tipo, valor }: { pref: string; tipo: TipoDato; valor?: string[] }) {
+  const lugares = tipo === 'telefono' ? (['pie', 'contacto'] as const) : (['contacto'] as const);
+  const nombres = { pie: 'Pie de página', contacto: 'Contacto por área' };
+  const actual = valor ?? ['pie', 'contacto'];
+  return (
+    <fieldset className="flex flex-wrap items-center gap-x-4 gap-y-1">
+      <input type="hidden" name="mostrar_en_campo" value="1" />
+      {/* Los correos no salen en el pie: se conserva ese valor tal cual. */}
+      {tipo === 'correo' && actual.includes('pie') && <input type="hidden" name="mostrar_en" value="pie" />}
+      <legend className="sr-only">Dónde se muestra</legend>
+      <span className="text-sm font-medium text-tinta-3">Mostrar en:</span>
+      {lugares.map((l) => (
+        <label key={l} htmlFor={`${pref}-en-${l}`} className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-tinta-2">
+          <input id={`${pref}-en-${l}`} type="checkbox" name="mostrar_en" value={l} defaultChecked={actual.includes(l)} className="size-4 accent-(--color-marca)" />
+          {nombres[l]}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
 function Visible({ id, marcado }: { id: string; marcado: boolean }) {
   return (
     <label htmlFor={id} className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-tinta-2">
@@ -198,6 +224,9 @@ function Fila({ d, empresa, primero, ultimo }: { d: Dato; empresa: EmpresaUI; pr
         <Campos tipo={d.tipo} d={d} bilingue={empresa.bilingue} />
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <Visible id={`${d.id}-visible`} marcado={d.visible} />
+          {empresa.ubicacionesDatos && (d.tipo === 'telefono' || d.tipo === 'correo') && (
+            <MostrarEn pref={d.id} tipo={d.tipo} valor={d.mostrar_en} />
+          )}
           {!d.visible && <Insignia tono="aviso">Oculto</Insignia>}
           <BotonEnviar variante="secundario" className="ml-auto py-1.5 lg:ml-0">
             Guardar cambios
@@ -240,7 +269,7 @@ export default async function DatosWeb({ params }: { params: Promise<{ empresa: 
   const sb = await supabaseServidor();
   const { data } = await sb
     .from('datos_contacto')
-    .select('id, tipo, etiqueta, etiqueta_en, valor, valor_en, detalle, red, orden, visible, actualizado')
+    .select('id, tipo, etiqueta, etiqueta_en, valor, valor_en, detalle, red, orden, visible, mostrar_en, actualizado')
     .eq('empresa_id', empresa.id)
     .order('orden')
     .order('id');
@@ -292,6 +321,9 @@ export default async function DatosWeb({ params }: { params: Promise<{ empresa: 
                     <Campos tipo={g.tipo} bilingue={empresa.bilingue} />
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                       <Visible id={`nuevo-${g.tipo}-visible`} marcado />
+                      {empresa.ubicacionesDatos && (g.tipo === 'telefono' || g.tipo === 'correo') && (
+                        <MostrarEn pref={`nuevo-${g.tipo}`} tipo={g.tipo} />
+                      )}
                       <BotonEnviar className="py-1.5" pendiente="Agregando…">
                         Agregar
                       </BotonEnviar>
