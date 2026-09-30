@@ -1,7 +1,8 @@
 import 'server-only';
 import { supabaseServicio } from '@/lib/supabase/servicio';
 import { EMPRESAS, type EmpresaUI } from '@/lib/empresas';
-import { enviarCorreo, plantilla, escaparHtml as esc } from '@/lib/correo';
+import { enviarCorreo, plantilla, escaparHtml as esc, type Adjunto as AdjuntoCorreo } from '@/lib/correo';
+import { etiquetaDato, valorDato } from '@/lib/etiquetas-datos';
 import { generarHoja, type DatosHoja } from '@/lib/reclamos/pdf';
 import { fechaLima, sumarHabiles, aISO } from '@/lib/reclamos/plazos';
 
@@ -312,9 +313,10 @@ export async function enviarRespuestaGuardada(empresa: Empresa, r: Reclamo) {
 export async function avisarMensaje(
   empresa: Empresa,
   m: { nombre: string; correo?: string | null; telefono?: string | null; empresa?: string | null; asunto?: string | null; mensaje?: string | null; tipo: string; datos: Record<string, string> },
+  adjuntos: AdjuntoCorreo[] = [],
 ) {
   if (!empresa.correo_contacto) return { enviado: false as const, motivo: 'Sin correo de avisos.' };
-  const extra = Object.entries(m.datos).map(([k, v]) => [k, v] as [string, string]);
+  const extra = Object.entries(m.datos).map(([k, v]) => [etiquetaDato(k), valorDato(k, v)] as [string, string]);
   return enviarCorreo(empresa.id, {
     para: [empresa.correo_contacto],
     responderA: m.correo ?? undefined,
@@ -332,9 +334,11 @@ export async function avisarMensaje(
         ['Servicio de interés', m.asunto ?? ''],
         ...extra,
         ['Mensaje', m.mensaje ?? ''],
+        ['Archivos adjuntos', adjuntos.map((a) => a.nombre).join(', ')],
       ],
       pie: 'Aviso automático del portal del Grupo Pacheco. El mensaje también queda guardado en el portal.',
     }),
     texto: `${m.nombre} (${m.correo ?? 'sin correo'}): ${m.mensaje ?? ''}`,
+    adjuntos,
   });
 }

@@ -24,7 +24,7 @@ export default async function Mensajes({
 
   let consulta = sb
     .from('mensajes')
-    .select('id, creado, tipo, nombre, empresa, correo, asunto, mensaje, leido')
+    .select('id, creado, tipo, nombre, empresa, correo, asunto, mensaje, leido, adjuntos')
     .eq('empresa_id', empresa.id)
     .order('creado', { ascending: false });
 
@@ -87,6 +87,11 @@ export default async function Mensajes({
                     </p>
                     {m.tipo === 'cotizacion' && <Insignia tono="marca">Cotización</Insignia>}
                     {m.asunto && <Insignia>{m.asunto}</Insignia>}
+                    {Array.isArray(m.adjuntos) && m.adjuntos.length > 0 && (
+                      <Insignia>
+                        {m.adjuntos.length} adjunto{m.adjuntos.length === 1 ? '' : 's'}
+                      </Insignia>
+                    )}
                   </div>
                   <p className="mt-1 line-clamp-1 text-sm text-tinta-3">{m.mensaje || m.correo}</p>
                 </div>
