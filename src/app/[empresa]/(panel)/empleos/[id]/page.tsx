@@ -147,7 +147,7 @@ export default async function EditarEmpleo({ params }: { params: Promise<{ empre
               className="campo"
               required
             />
-            <p className="mt-1 text-xs text-tinta-3">El botón «Postular» de la web abre un correo a esta dirección.</p>
+            <p className="mt-1 text-xs text-tinta-3">A este correo llega el aviso de cada postulación, con el CV adjunto.</p>
           </div>
           <div>
             <label htmlFor="fecha_cierre" className="etiqueta">
