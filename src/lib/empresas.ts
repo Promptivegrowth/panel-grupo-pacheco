@@ -4,7 +4,7 @@
  * lo que necesita la interfaz y que no cambia desde el panel.
  */
 
-export type Modulo = 'reclamos' | 'mensajes' | 'sitio' | 'empleos' | 'postulaciones';
+export type Modulo = 'reclamos' | 'mensajes' | 'sitio' | 'catalogo' | 'empleos' | 'postulaciones';
 
 export type EmpresaUI = {
   id: 'lp' | 'qmedical' | 'woli';
@@ -45,7 +45,8 @@ export const EMPRESAS: Record<EmpresaUI['id'], EmpresaUI> = {
     color: '#152e7f',
     prefijo: 'QM',
     bilingue: true,
-    modulos: ['reclamos', 'mensajes', 'sitio'],
+    // Q-MEDICAL actualiza su portafolio una vez al ano: lo administra ella.
+    modulos: ['reclamos', 'mensajes', 'sitio', 'catalogo'],
   },
   woli: {
     id: 'woli',
@@ -78,6 +79,7 @@ export const NOMBRE_MODULO: Record<Modulo, string> = {
   reclamos: 'Libro de reclamaciones',
   mensajes: 'Mensajes de contacto',
   sitio: 'Datos de la web',
+  catalogo: 'Catálogo de productos',
   empleos: 'Trabaja con nosotros',
   postulaciones: 'Postulaciones',
 };
