@@ -1,20 +1,27 @@
 /**
- * Carga el catálogo de Q-MEDICAL en la base, a partir del archivo que hoy
- * vive en el repositorio de la web.
+ * Carga el catálogo de Q-MEDICAL en la base, a partir de los archivos que hoy
+ * viven en el repositorio de la web.
  *
  * Se ejecuta una sola vez, al poner en marcha la edición desde el panel: a
  * partir de ahí la fuente es la base y este guion no vuelve a usarse.
  *
- *   node scripts/sembrar-catalogo.mjs <ruta a qmedical-web> [--borrar]
+ *   node --experimental-strip-types scripts/sembrar-catalogo.mjs <ruta a qmedical-web> [--borrar]
+ *
+ * El indicador de Node hace falta porque el catálogo de la web está en
+ * TypeScript y aquí se importa tal cual, sin compilarlo: así lo que se siembra
+ * es exactamente lo que publica la web, sin un lector propio que pueda
+ * entender de otra manera un literal. En Node 22.18 o posterior ya está
+ * activado y el indicador sobra.
  *
  * Con --borrar vacía primero las tablas del catálogo de esa empresa, para
  * poder repetir la siembra mientras se ajusta. Sin eso, se niega a sembrar
  * sobre un catálogo que ya tiene datos: sería duplicarlo.
  *
- * Requiere SUPABASE_URL y SUPABASE_SERVICE_ROLE en .env.local.
+ * Requiere NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en .env.local.
  */
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const EMPRESA = 'qmedical';
 const raiz = path.resolve(import.meta.dirname, '..');
@@ -22,7 +29,7 @@ const raiz = path.resolve(import.meta.dirname, '..');
 const web = process.argv[2];
 const borrar = process.argv.includes('--borrar');
 if (!web) {
-  console.error('Uso: node scripts/sembrar-catalogo.mjs <ruta a qmedical-web> [--borrar]');
+  console.error('Uso: node --experimental-strip-types scripts/sembrar-catalogo.mjs <ruta a qmedical-web> [--borrar]');
   process.exit(1);
 }
 
@@ -38,9 +45,9 @@ const env = Object.fromEntries(
 );
 
 const URL_BASE = env.SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL;
-const CLAVE = env.SUPABASE_SERVICE_ROLE;
+const CLAVE = env.SUPABASE_SERVICE_ROLE_KEY;
 if (!URL_BASE || !CLAVE) {
-  console.error('Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE en .env.local');
+  console.error('Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en .env.local');
   process.exit(1);
 }
 
@@ -60,89 +67,17 @@ async function rest(tabla, opciones = {}) {
   return texto ? JSON.parse(texto) : [];
 }
 
-/* ── El catálogo, leído del módulo de la web ───────────────────────────
-   El archivo es TypeScript, así que se extraen los literales en vez de
-   importarlo: evita arrastrar un compilador solo para una siembra. */
-const fuente = await readFile(path.join(web, 'src/data/catalogo.ts'), 'utf8');
-const manifest = JSON.parse(
-  await readFile(path.join(web, 'public/img/manifest.json'), 'utf8')
-);
+/* ── El catálogo y su traducción, leídos del repositorio de la web ──── */
+const mod = (rel) => import(pathToFileURL(path.join(web, rel)).href);
 
-function bloque(nombre) {
-  const i = fuente.indexOf(`export const ${nombre}`);
-  const j = fuente.indexOf('\n];', i);
-  return fuente.slice(fuente.indexOf('[', i) + 1, j);
-}
+const { lineas, categorias, productos } = await mod('src/data/catalogo.ts');
+const { lineasEn, categoriasEnCat, productosEn, medidasEn, unidadesEn, caracteristicasEn } =
+  await mod('src/i18n/productos-en.ts');
+const manifest = JSON.parse(await readFile(path.join(web, 'public/img/manifest.json'), 'utf8'));
 
-/** Convierte los literales de un bloque en objetos, sin evaluar código. */
-function objetos(texto) {
-  const out = [];
-  let nivel = 0;
-  let desde = -1;
-  for (let i = 0; i < texto.length; i++) {
-    if (texto[i] === '{') {
-      if (nivel === 0) desde = i;
-      nivel++;
-    } else if (texto[i] === '}') {
-      nivel--;
-      if (nivel === 0) out.push(texto.slice(desde, i + 1));
-    }
-  }
-  return out;
-}
-
-const campo = (t, nombre) => {
-  const m = t.match(new RegExp(`\\b${nombre}:\\s*((?:'(?:[^'\\\\]|\\\\.)*'\\s*\\+?\\s*)+)`));
-  if (!m) return null;
-  return [...m[1].matchAll(/'((?:[^'\\]|\\.)*)'/g)]
-    .map((x) => x[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\'))
-    .join('');
-};
-
-const lista = (t, nombre) => {
-  const m = t.match(new RegExp(`\\b${nombre}:\\s*\\[([^\\]]*)\\]`, 's'));
-  if (!m) return [];
-  return [...m[1].matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((x) => x[1].replace(/\\'/g, "'"));
-};
-
-const lineas = objetos(bloque('lineas')).map((t, i) => ({
-  slug: campo(t, 'slug'), nombre: campo(t, 'nombre'),
-  resumen: campo(t, 'resumen') ?? '', icono: campo(t, 'icono') ?? '', orden: i,
-}));
-
-const categorias = objetos(bloque('categorias')).map((t, i) => ({
-  slug: campo(t, 'slug'), nombre: campo(t, 'nombre'),
-  linea: campo(t, 'linea'), orden: i,
-}));
-
-/* Los productos llevan presentaciones anidadas: se parten por el nivel
-   superior y de cada uno se extrae su propio arreglo. */
-const productos = objetos(bloque('productos')).map((t, i) => {
-  const pres = t.indexOf('presentaciones:');
-  const cabeza = t.slice(0, pres);
-  return {
-    slug: campo(cabeza, 'slug'),
-    nombre: campo(cabeza, 'nombre'),
-    linea: campo(cabeza, 'linea'),
-    categoria: campo(cabeza, 'categoria'),
-    descripcion: campo(cabeza, 'descripcion') ?? '',
-    destacado: /destacado:\s*true/.test(cabeza),
-    orden: i,
-    presentaciones: objetos(t.slice(pres)).map((p, j) => ({
-      medida: campo(p, 'medida') ?? '',
-      marca: campo(p, 'marca') ?? '',
-      marca_slug: campo(p, 'marcaSlug'),
-      unidad: campo(p, 'unidad') ?? '',
-      caracteristicas: lista(p, 'caracteristicas'),
-      descripcion: campo(p, 'descripcion'),
-      orden: j,
-    })),
-  };
-});
-
+const nPres = productos.reduce((n, p) => n + p.presentaciones.length, 0);
 console.log('leido: %d lineas, %d categorias, %d productos, %d presentaciones',
-  lineas.length, categorias.length, productos.length,
-  productos.reduce((n, p) => n + p.presentaciones.length, 0));
+  lineas.length, categorias.length, productos.length, nPres);
 
 /* ── Siembra ───────────────────────────────────────────────────────── */
 if (borrar) {
@@ -158,50 +93,89 @@ if (borrar) {
 }
 
 const idLinea = {};
-for (const l of lineas) {
+for (const [i, l] of lineas.entries()) {
+  const t = lineasEn[l.slug];
   const [fila] = await rest('catalogo_lineas', {
     method: 'POST',
-    body: JSON.stringify({ empresa_id: EMPRESA, ...l }),
+    body: JSON.stringify({
+      empresa_id: EMPRESA,
+      slug: l.slug,
+      nombre: l.nombre,
+      nombre_en: t?.nombre ?? null,
+      resumen: l.resumen,
+      resumen_en: t?.resumen ?? null,
+      icono: l.icono,
+      orden: i,
+    }),
   });
   idLinea[l.slug] = fila.id;
 }
 console.log('lineas sembradas: %d', lineas.length);
 
 const idCat = {};
-for (const c of categorias) {
+for (const [i, c] of categorias.entries()) {
   const [fila] = await rest('catalogo_categorias', {
     method: 'POST',
     body: JSON.stringify({
-      empresa_id: EMPRESA, linea_id: idLinea[c.linea],
-      slug: c.slug, nombre: c.nombre, orden: c.orden,
+      empresa_id: EMPRESA,
+      linea_id: idLinea[c.linea],
+      slug: c.slug,
+      nombre: c.nombre,
+      nombre_en: categoriasEnCat[c.slug] ?? null,
+      orden: i,
     }),
   });
   idCat[c.slug] = fila.id;
 }
 console.log('categorias sembradas: %d', categorias.length);
 
-let nPres = 0;
-for (const p of productos) {
+let puestas = 0;
+let sinFoto = 0;
+for (const [i, p] of productos.entries()) {
+  const t = productosEn[p.slug];
   const [fila] = await rest('catalogo_productos', {
     method: 'POST',
     body: JSON.stringify({
-      empresa_id: EMPRESA, categoria_id: idCat[p.categoria],
-      slug: p.slug, nombre: p.nombre, descripcion: p.descripcion,
-      destacado: p.destacado, orden: p.orden,
+      empresa_id: EMPRESA,
+      categoria_id: idCat[p.categoria],
+      slug: p.slug,
+      nombre: p.nombre,
+      nombre_en: t?.nombre ?? null,
+      descripcion: p.descripcion,
+      descripcion_en: t?.descripcion ?? null,
+      destacado: Boolean(p.destacado),
+      orden: i,
     }),
   });
+
   const fotos = manifest.productos?.[p.slug] ?? [];
-  const cuerpo = p.presentaciones.map((pr, j) => ({
-    producto_id: fila.id,
-    ...pr,
-    // La foto viaja como la ruta que ya tiene la web; al subir una nueva
-    // desde el panel, pasa a ser la del bucket.
-    imagen: fotos[j] || null,
-  }));
+  const cuerpo = p.presentaciones.map((pr, j) => {
+    if (!fotos[j]) sinFoto++;
+    return {
+      producto_id: fila.id,
+      medida: pr.medida,
+      medida_en: medidasEn[pr.medida] ?? null,
+      marca: pr.marca,
+      marca_slug: pr.marcaSlug ?? null,
+      unidad: pr.unidad,
+      unidad_en: unidadesEn[pr.unidad] ?? null,
+      caracteristicas: pr.caracteristicas,
+      // Línea a línea, como en la web: lo que no esté traducido se queda en
+      // castellano al mostrarlo.
+      caracteristicas_en: pr.caracteristicas.map((c) => caracteristicasEn[c] ?? c),
+      descripcion: pr.descripcion ?? null,
+      descripcion_en: t?.descripciones?.[j] ?? null,
+      // La foto viaja como la ruta que ya tiene la web; al subir una nueva
+      // desde el panel, pasa a ser la del bucket.
+      imagen: fotos[j] || null,
+      orden: j,
+    };
+  });
   if (cuerpo.length) {
     await rest('catalogo_presentaciones', { method: 'POST', body: JSON.stringify(cuerpo) });
-    nPres += cuerpo.length;
+    puestas += cuerpo.length;
   }
 }
-console.log('productos sembrados: %d, con %d presentaciones', productos.length, nPres);
+console.log('productos sembrados: %d, con %d presentaciones (%d sin fotografia)',
+  productos.length, puestas, sinFoto);
 console.log('listo');

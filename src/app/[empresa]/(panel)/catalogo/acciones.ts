@@ -181,21 +181,40 @@ export async function guardarPresentacion(
   if (!productoId) return { ok: false, mensaje: 'Falta el producto al que pertenece.' };
 
   /* Las características llegan una por línea, que es como las escribe quien
-     las copia de la ficha del fabricante. */
-  const caracteristicas = String(datos.get('caracteristicas') ?? '')
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .slice(0, 20);
+     las copia de la ficha del fabricante. La traducción va línea a línea en
+     el mismo orden: si trae un número distinto de líneas, se guarda vacía
+     antes que desalineada, porque la web empareja por posición. */
+  const lineasDe = (campo: string) =>
+    String(datos.get(campo) ?? '')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .slice(0, 40);
+
+  const caracteristicas = lineasDe('caracteristicas');
+  const caracteristicasEn = lineasDe('caracteristicas_en');
+  if (caracteristicasEn.length && caracteristicasEn.length !== caracteristicas.length) {
+    return {
+      ok: false,
+      mensaje:
+        `Las características en inglés son ${caracteristicasEn.length} líneas y las de ` +
+        `castellano ${caracteristicas.length}. La web las empareja línea por línea: ` +
+        'deje el mismo número en las dos, o vacío el inglés.',
+    };
+  }
 
   const fila = {
     producto_id: productoId,
     medida: texto(80).parse(datos.get('medida') ?? ''),
+    medida_en: texto(80).parse(datos.get('medida_en') ?? '') || null,
     marca: texto(80).parse(datos.get('marca') ?? ''),
     marca_slug: texto(60).parse(datos.get('marca_slug') ?? '') || null,
     unidad: texto(60).parse(datos.get('unidad') ?? ''),
+    unidad_en: texto(60).parse(datos.get('unidad_en') ?? '') || null,
     caracteristicas,
+    caracteristicas_en: caracteristicasEn,
     descripcion: texto(2000).parse(datos.get('descripcion') ?? '') || null,
+    descripcion_en: texto(2000).parse(datos.get('descripcion_en') ?? '') || null,
     registro_sanitario: texto(120).parse(datos.get('registro_sanitario') ?? '') || null,
     normativa: texto(200).parse(datos.get('normativa') ?? '') || null,
     orden: Number(datos.get('orden') ?? 0) || 0,
@@ -203,7 +222,9 @@ export async function guardarPresentacion(
   };
 
   /* La fotografía se sube aparte, al bucket `catalogo`, bajo la carpeta de
-     la empresa: así la política de almacenamiento sabe de quién es. */
+     la empresa: así la política de almacenamiento sabe de quién es. En la
+     fila se guarda su dirección pública, que es lo que distingue a una foto
+     subida aquí de las que ya venían con la web. */
   const foto = datos.get('foto');
   let imagen: string | undefined;
   if (foto instanceof File && foto.size > 0) {
@@ -217,7 +238,7 @@ export async function guardarPresentacion(
       .from('catalogo')
       .upload(ruta, foto, { contentType: foto.type, upsert: false });
     if (errSubida) return { ok: false, mensaje: 'No se pudo subir la imagen.' };
-    imagen = ruta;
+    imagen = sb.storage.from('catalogo').getPublicUrl(ruta).data.publicUrl;
   }
 
   const { error } = id
@@ -227,6 +248,102 @@ export async function guardarPresentacion(
 
   refresh();
   return { ok: true, mensaje: id ? 'Presentación actualizada.' : 'Presentación creada.' };
+}
+
+/**
+ * Quita la fotografía de una presentación. Si estaba subida desde el panel se
+ * borra también del almacenamiento; si venía con la web, solo se desenlaza:
+ * el archivo es del repositorio y no es de aquí borrarlo.
+ */
+export async function quitarFoto(
+  _previo: EstadoAccion,
+  datos: FormData,
+): Promise<EstadoAccion> {
+  const empresa = String(datos.get('empresa') ?? '');
+  await exigirAcceso(empresa, 'catalogo');
+  const sb = await supabaseServidor();
+
+  const id = String(datos.get('id') ?? '');
+  if (!id) return { ok: false, mensaje: 'No se pudo quitar la fotografía.' };
+
+  const { data: fila } = await sb
+    .from('catalogo_presentaciones')
+    .select('imagen')
+    .eq('id', id)
+    .maybeSingle();
+
+  const { error } = await sb
+    .from('catalogo_presentaciones')
+    .update({ imagen: null })
+    .eq('id', id);
+  if (error) return { ok: false, mensaje: 'No se pudo quitar la fotografía.' };
+
+  const marca = '/storage/v1/object/public/catalogo/';
+  const i = fila?.imagen?.indexOf(marca) ?? -1;
+  if (fila?.imagen && i >= 0) {
+    await sb.storage.from('catalogo').remove([fila.imagen.slice(i + marca.length)]);
+  }
+
+  refresh();
+  return { ok: true, mensaje: 'Fotografía quitada.' };
+}
+
+/* ═══════════════════════════════════════════════════════════════ orden */
+
+/**
+ * Tablas que se pueden reordenar y con qué comparten lugar: una categoría se
+ * ordena dentro de su línea, un producto dentro de su categoría. Las líneas
+ * se ordenan entre todas las de la empresa.
+ */
+const HERMANOS = {
+  catalogo_lineas: 'empresa_id',
+  catalogo_categorias: 'linea_id',
+  catalogo_productos: 'categoria_id',
+  catalogo_presentaciones: 'producto_id',
+} as const;
+
+type TablaOrdenable = keyof typeof HERMANOS;
+
+/**
+ * Sube o baja una fila un puesto. Se renumera el grupo completo para que el
+ * orden quede siempre 1, 2, 3…: el sitio publica en ese orden, y una
+ * numeración con huecos se vuelve difícil de seguir al cabo de varias
+ * ediciones.
+ */
+export async function moverFila(
+  _previo: EstadoAccion,
+  datos: FormData,
+): Promise<EstadoAccion> {
+  const empresa = String(datos.get('empresa') ?? '');
+  await exigirAcceso(empresa, 'catalogo');
+  const sb = await supabaseServidor();
+
+  const tabla = String(datos.get('tabla') ?? '') as TablaOrdenable;
+  const id = String(datos.get('id') ?? '');
+  const padre = String(datos.get('padre') ?? '');
+  const sentido = datos.get('sentido') === 'arriba' ? -1 : 1;
+  if (!(tabla in HERMANOS) || !id || !padre) return { ok: false, mensaje: 'No se pudo reordenar.' };
+
+  const { data } = await sb
+    .from(tabla)
+    .select('id, orden')
+    .eq(HERMANOS[tabla], padre)
+    .order('orden')
+    .order('id');
+  const lista = data ?? [];
+
+  const i = lista.findIndex((f) => f.id === id);
+  const j = i + sentido;
+  if (i < 0 || j < 0 || j >= lista.length) return null;
+
+  [lista[i], lista[j]] = [lista[j], lista[i]];
+  const fallos = await Promise.all(
+    lista.map((f, k) => sb.from(tabla).update({ orden: k + 1 }).eq('id', f.id)),
+  );
+  if (fallos.some((r) => r.error)) return { ok: false, mensaje: 'No se pudo reordenar.' };
+
+  refresh();
+  return null;
 }
 
 /* ════════════════════════════════════════════════════════════ borrados */

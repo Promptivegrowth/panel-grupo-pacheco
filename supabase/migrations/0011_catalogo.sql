@@ -83,18 +83,31 @@ create index catalogo_productos_categoria on public.catalogo_productos (categori
 --
 -- `registro_sanitario` y `normativa` nacen vacíos: la empresa todavía no los
 -- entregó, y la ficha de la web los muestra solo cuando existen.
+--
+-- Las columnas `_en` guardan la versión inglesa. Vacías, la web muestra el
+-- castellano: una traducción a medias nunca deja la ficha en blanco. La
+-- medida y la unidad también la llevan porque muchas son palabras —«TALLA L»,
+-- «caja x 30 und»— y no solo cifras.
 create table public.catalogo_presentaciones (
   id                  uuid primary key default gen_random_uuid(),
   producto_id         uuid not null references public.catalogo_productos (id) on delete cascade,
   medida              text not null default '',   -- «0.95 L», «3 ML», «Kit A»
+  medida_en           text,                       -- solo si lleva palabras: «TALLA L»
   marca               text not null default '',
   marca_slug          text,                       -- si la marca tiene ficha propia
   unidad              text not null default '',   -- cómo se vende
+  unidad_en           text,
   caracteristicas     text[] not null default '{}',
+  caracteristicas_en  text[] not null default '{}',
   descripcion         text,                       -- solo si difiere de la del producto
+  descripcion_en      text,
   registro_sanitario  text,
   normativa           text,
-  imagen              text,                       -- ruta en el bucket `catalogo`
+  -- Fotografía. Dos formas, y se distinguen solas: una dirección completa
+  -- («https://…/storage/v1/object/public/catalogo/…») es una foto subida
+  -- desde el panel; cualquier otra cosa es una ruta relativa a /img/ de la
+  -- web, que es como llegaron las que ya venían en el repositorio.
+  imagen              text,
   orden               int  not null default 0,
   visible             boolean not null default true,
   actualizado         timestamptz not null default now(),
