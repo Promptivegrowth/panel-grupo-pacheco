@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { exigirAcceso } from '@/lib/sesion';
 import { supabaseServidor } from '@/lib/supabase/servidor';
-import { Cabecera, Insignia, Vacio } from '@/componentes/ui';
+import { Cabecera, Insignia, Vacio, formatoFecha } from '@/componentes/ui';
 import { FormAccion, BotonEnviar } from '@/componentes/formulario';
-import { guardarLinea, guardarCategoria } from './acciones';
+import { hookDe } from '@/lib/publicar';
+import { guardarLinea, guardarCategoria, publicar } from './acciones';
 import { Borrar, Campo, Flechas, Visible, cuenta } from './piezas';
 
 export const metadata = { title: 'Catálogo de productos' };
@@ -61,6 +62,20 @@ export default async function Catalogo({ params }: { params: Promise<{ empresa: 
   const categorias = (dCategorias ?? []) as Categoria[];
   const productos = dProductos ?? [];
 
+  /* La web es estática: lo editado aquí sale publicado en la siguiente
+     compilación. Si la empresa tiene configurada su dirección de
+     publicación, puede pedirla ella desde esta pantalla. */
+  const puedePublicar = Boolean(hookDe(empresa.id));
+  const { data: ultima } = puedePublicar
+    ? await sb
+        .from('publicaciones')
+        .select('creado, ok, detalle')
+        .eq('empresa_id', empresa.id)
+        .order('creado', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+
   const porCategoria = new Map<string, number>();
   for (const p of productos) porCategoria.set(p.categoria_id, (porCategoria.get(p.categoria_id) ?? 0) + 1);
   const deLinea = (lineaId: string) => categorias.filter((c) => c.linea_id === lineaId);
@@ -81,6 +96,33 @@ export default async function Catalogo({ params }: { params: Promise<{ empresa: 
           </>
         }
       />
+
+      {puedePublicar && (
+        <section className="caja mb-6 flex flex-wrap items-center justify-between gap-4 p-5" aria-labelledby="publicar">
+          <div className="min-w-0">
+            <h2 id="publicar" className="font-bold text-tinta">
+              Publicar en la web
+            </h2>
+            <p className="text-sm text-tinta-3">
+              {ultima
+                ? ultima.ok
+                  ? `Última publicación pedida el ${formatoFecha(ultima.creado)}.`
+                  : `El ${formatoFecha(ultima.creado)} no se pudo publicar: ${ultima.detalle}`
+                : 'Todavía no se ha publicado desde aquí.'}{' '}
+              Tarda un par de minutos; mientras tanto la web muestra el catálogo anterior.
+            </p>
+          </div>
+          <FormAccion accion={publicar} claseAviso="basis-full">
+            <input type="hidden" name="empresa" value={empresa.id} />
+            <BotonEnviar
+              pendiente="Pidiendo…"
+              confirmar="¿Publicar el catálogo en la web? Se compila el sitio con lo que hay ahora."
+            >
+              Publicar los cambios
+            </BotonEnviar>
+          </FormAccion>
+        </section>
+      )}
 
       {lineas.length === 0 ? (
         <Vacio titulo="Todavía no hay líneas" texto="Empiece por una línea: las categorías y los productos cuelgan de ella." />
@@ -120,7 +162,10 @@ export default async function Catalogo({ params }: { params: Promise<{ empresa: 
               {deLinea(l.id).length > 0 ? (
                 <ul className="mb-4 grid gap-2 sm:grid-cols-2">
                   {deLinea(l.id).map((c) => (
-                    <li key={c.id}>
+                    /* `min-w-0`: sin eso el nombre largo de una categoría
+                       ensancha la columna de la rejilla y la pantalla
+                       desborda a lo ancho en el móvil. */
+                    <li key={c.id} className="min-w-0">
                       <Link
                         href={`${base}/categoria/${c.id}`}
                         className="flex items-center justify-between gap-3 rounded-lg border border-linea bg-white px-3.5 py-2.5 text-sm hover:border-tinta-3 hover:bg-fondo"

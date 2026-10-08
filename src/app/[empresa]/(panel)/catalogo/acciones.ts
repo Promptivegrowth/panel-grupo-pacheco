@@ -2,8 +2,9 @@
 
 import { refresh } from 'next/cache';
 import { z } from 'zod';
-import { exigirAcceso } from '@/lib/sesion';
+import { exigirAcceso, usuarioActual } from '@/lib/sesion';
 import { supabaseServidor } from '@/lib/supabase/servidor';
+import { pedirPublicacion } from '@/lib/publicar';
 import type { EstadoAccion } from '@/componentes/formulario';
 
 /**
@@ -278,11 +279,8 @@ export async function quitarFoto(
     .eq('id', id);
   if (error) return { ok: false, mensaje: 'No se pudo quitar la fotografía.' };
 
-  const marca = '/storage/v1/object/public/catalogo/';
-  const i = fila?.imagen?.indexOf(marca) ?? -1;
-  if (fila?.imagen && i >= 0) {
-    await sb.storage.from('catalogo').remove([fila.imagen.slice(i + marca.length)]);
-  }
+  const objeto = fila?.imagen ? objetoDe(fila.imagen) : null;
+  if (objeto) await sb.storage.from('catalogo').remove([objeto]);
 
   refresh();
   return { ok: true, mensaje: 'Fotografía quitada.' };
@@ -349,10 +347,63 @@ export async function moverFila(
 /* ════════════════════════════════════════════════════════════ borrados */
 
 /**
+ * Fotografías subidas desde el panel que cuelgan de lo que se va a borrar.
+ *
+ * La cascada de la base se lleva las filas, pero no los archivos: sin esto el
+ * almacenamiento acumularía fotos que ya no referencia nadie.
+ */
+async function fotosDe(
+  sb: Awaited<ReturnType<typeof supabaseServidor>>,
+  tabla: string,
+  id: string,
+  empresaId: string,
+): Promise<string[]> {
+  let productos: string[] = [];
+
+  if (tabla === 'catalogo_presentaciones') {
+    const { data } = await sb.from('catalogo_presentaciones').select('imagen').eq('id', id);
+    return (data ?? []).map((f) => f.imagen).filter((v): v is string => Boolean(v));
+  }
+
+  if (tabla === 'catalogo_productos') {
+    productos = [id];
+  } else {
+    /* Una línea o una categoría: hay que llegar a sus productos. */
+    const categorias =
+      tabla === 'catalogo_categorias'
+        ? [id]
+        : ((
+            await sb.from('catalogo_categorias').select('id').eq('empresa_id', empresaId).eq('linea_id', id)
+          ).data ?? []).map((c) => c.id);
+    if (!categorias.length) return [];
+    const { data } = await sb
+      .from('catalogo_productos')
+      .select('id')
+      .eq('empresa_id', empresaId)
+      .in('categoria_id', categorias);
+    productos = (data ?? []).map((p) => p.id);
+  }
+  if (!productos.length) return [];
+
+  const { data } = await sb.from('catalogo_presentaciones').select('imagen').in('producto_id', productos);
+  return (data ?? []).map((f) => f.imagen).filter((v): v is string => Boolean(v));
+}
+
+/** Pasa de la dirección pública al nombre del objeto en el bucket. */
+const MARCA_BUCKET = '/storage/v1/object/public/catalogo/';
+function objetoDe(imagen: string): string | null {
+  const i = imagen.indexOf(MARCA_BUCKET);
+  return i >= 0 ? imagen.slice(i + MARCA_BUCKET.length) : null;
+}
+
+/**
  * Borra una fila del catálogo. Las categorías, los productos y las
  * presentaciones caen en cascada desde su padre, de modo que borrar una
  * línea se lleva todo lo que cuelga de ella: se avisa en la pantalla antes
  * de confirmar.
+ *
+ * Las fotografías subidas desde el panel se borran también. Las que vinieron
+ * con la web no: son archivos del repositorio y no es de aquí borrarlos.
  */
 export async function borrar(
   _previo: EstadoAccion,
@@ -372,9 +423,54 @@ export async function borrar(
   ];
   if (!PERMITIDAS.includes(tabla) || !id) return { ok: false, mensaje: 'No se pudo borrar.' };
 
+  /* Se buscan antes de borrar: después ya no hay por dónde llegar a ellas. */
+  const objetos = (await fotosDe(sb, tabla, id, empresa))
+    .map(objetoDe)
+    .filter((v): v is string => Boolean(v));
+
   const { error } = await sb.from(tabla).delete().eq('id', id);
   if (error) return { ok: false, mensaje: 'No se pudo borrar.' };
 
+  if (objetos.length) await sb.storage.from('catalogo').remove(objetos);
+
   refresh();
   return { ok: true, mensaje: 'Eliminado.' };
+}
+
+/* ═════════════════════════════════════════════════════════ publicación */
+
+/**
+ * Pide que la web se vuelva a compilar con lo que hay ahora en la base.
+ *
+ * No se pide sola en cada guardado: una tarde de edición son decenas de
+ * cambios, y cada uno encolaría una compilación. El botón lo pulsa la empresa
+ * cuando termina, y queda anotado quién lo pulsó.
+ */
+export async function publicar(
+  _previo: EstadoAccion,
+  datos: FormData,
+): Promise<EstadoAccion> {
+  const empresa = String(datos.get('empresa') ?? '');
+  await exigirAcceso(empresa, 'catalogo');
+
+  const r = await pedirPublicacion(empresa);
+
+  const sb = await supabaseServidor();
+  const usuario = await usuarioActual();
+  await sb.from('publicaciones').insert({
+    empresa_id: empresa,
+    creado_por: usuario?.id ?? null,
+    ok: r.ok,
+    detalle: r.detalle,
+  });
+
+  refresh();
+  return r.ok
+    ? {
+        ok: true,
+        mensaje:
+          'Publicación pedida. La web tarda un par de minutos en compilarse; ' +
+          'recargue el sitio pasado ese tiempo.',
+      }
+    : { ok: false, mensaje: r.detalle };
 }

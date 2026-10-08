@@ -3,6 +3,7 @@ import { exigirAcceso } from '@/lib/sesion';
 import { supabaseServidor } from '@/lib/supabase/servidor';
 import { Cabecera, Insignia } from '@/componentes/ui';
 import { FormAccion, BotonEnviar } from '@/componentes/formulario';
+import { baseWeb } from '@/lib/web';
 import { guardarProducto, guardarPresentacion, quitarFoto } from '../../acciones';
 import { Borrar, Campo, Flechas, Visible, cuenta } from '../../piezas';
 
@@ -36,7 +37,7 @@ type Presentacion = {
  */
 function urlFoto(imagen: string, sitio: string): string {
   if (/^https?:\/\//.test(imagen)) return imagen;
-  return `${sitio.replace(/\/$/, '')}/img/${imagen.replace(/^\//, '')}`;
+  return `${sitio}/img/${imagen.replace(/^\//, '')}`;
 }
 
 /** Campos de una presentación, compartidos por la edición y el alta. */
@@ -188,7 +189,7 @@ export default async function ProductoCatalogo({
 
   const categorias = dCategorias ?? [];
   const presentaciones = (dPres ?? []) as Presentacion[];
-  const sitio = dEmpresa?.sitio_url ?? '';
+  const sitio = baseWeb(empresa.id, dEmpresa?.sitio_url);
 
   const base = `/${empresa.id}/catalogo`;
   const cat = categorias.find((c) => c.id === p.categoria_id);
@@ -307,6 +308,9 @@ export default async function ProductoCatalogo({
                     {!pr.visible && <Insignia tono="aviso">Oculta</Insignia>}
                     {!pr.imagen && <Insignia tono="aviso">Sin fotografía</Insignia>}
                   </h3>
+                  {/* Reordenar y eliminar van aquí, fuera del formulario que
+                      guarda la presentación: los formularios no se pueden
+                      anidar, y cada uno de estos es el suyo. */}
                   <div className="flex items-center gap-1.5">
                     <Flechas
                       empresa={empresa.id}
@@ -315,6 +319,13 @@ export default async function ProductoCatalogo({
                       padre={p.id}
                       primero={i === 0}
                       ultimo={i === presentaciones.length - 1}
+                    />
+                    <Borrar
+                      empresa={empresa.id}
+                      tabla="catalogo_presentaciones"
+                      id={pr.id}
+                      texto="Eliminar"
+                      confirmar={`¿Eliminar la presentación «${pr.medida || pr.marca}»?`}
                     />
                   </div>
                 </div>
@@ -377,15 +388,8 @@ export default async function ProductoCatalogo({
                       </div>
                       <Visible id={`${pr.id}-visible`} marcado={pr.visible} />
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-linea pt-3">
-                      <Borrar
-                        empresa={empresa.id}
-                        tabla="catalogo_presentaciones"
-                        id={pr.id}
-                        texto="Eliminar la presentación"
-                        confirmar={`¿Eliminar la presentación «${pr.medida || pr.marca}»?`}
-                      />
-                      <BotonEnviar variante="secundario" className="ml-auto py-1.5">
+                    <div className="mt-3 flex justify-end border-t border-linea pt-3">
+                      <BotonEnviar variante="secundario" className="py-1.5">
                         Guardar la presentación
                       </BotonEnviar>
                     </div>
