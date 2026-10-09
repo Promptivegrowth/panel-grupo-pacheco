@@ -2,9 +2,8 @@
 
 import { refresh } from 'next/cache';
 import { z } from 'zod';
-import { exigirAcceso, usuarioActual } from '@/lib/sesion';
+import { exigirAcceso } from '@/lib/sesion';
 import { supabaseServidor } from '@/lib/supabase/servidor';
-import { pedirPublicacion } from '@/lib/publicar';
 import type { EstadoAccion } from '@/componentes/formulario';
 
 /**
@@ -13,6 +12,9 @@ import type { EstadoAccion } from '@/componentes/formulario';
  * La jerarquía es línea → categoría → producto → presentación. Se guarda con
  * la sesión del usuario: la RLS solo deja escribir al rol maestro, igual que
  * en el resto del panel.
+ *
+ * Lo que se guarda aquí sale publicado solo: la web arma sus páginas al
+ * pedirlas y relee el catálogo cada minuto. No hay que publicar nada.
  *
  * El `slug` va en la dirección de la web, así que se normaliza aquí y no se
  * deja escribir a mano: un slug con tildes o espacios rompe el enlace, y
@@ -435,42 +437,4 @@ export async function borrar(
 
   refresh();
   return { ok: true, mensaje: 'Eliminado.' };
-}
-
-/* ═════════════════════════════════════════════════════════ publicación */
-
-/**
- * Pide que la web se vuelva a compilar con lo que hay ahora en la base.
- *
- * No se pide sola en cada guardado: una tarde de edición son decenas de
- * cambios, y cada uno encolaría una compilación. El botón lo pulsa la empresa
- * cuando termina, y queda anotado quién lo pulsó.
- */
-export async function publicar(
-  _previo: EstadoAccion,
-  datos: FormData,
-): Promise<EstadoAccion> {
-  const empresa = String(datos.get('empresa') ?? '');
-  await exigirAcceso(empresa, 'catalogo');
-
-  const r = await pedirPublicacion(empresa);
-
-  const sb = await supabaseServidor();
-  const usuario = await usuarioActual();
-  await sb.from('publicaciones').insert({
-    empresa_id: empresa,
-    creado_por: usuario?.id ?? null,
-    ok: r.ok,
-    detalle: r.detalle,
-  });
-
-  refresh();
-  return r.ok
-    ? {
-        ok: true,
-        mensaje:
-          'Publicación pedida. La web tarda un par de minutos en compilarse; ' +
-          'recargue el sitio pasado ese tiempo.',
-      }
-    : { ok: false, mensaje: r.detalle };
 }

@@ -1,10 +1,9 @@
 import Link from 'next/link';
 import { exigirAcceso } from '@/lib/sesion';
 import { supabaseServidor } from '@/lib/supabase/servidor';
-import { Cabecera, Insignia, Vacio, formatoFecha } from '@/componentes/ui';
+import { Cabecera, Insignia, Vacio } from '@/componentes/ui';
 import { FormAccion, BotonEnviar } from '@/componentes/formulario';
-import { hookDe } from '@/lib/publicar';
-import { guardarLinea, guardarCategoria, publicar } from './acciones';
+import { guardarLinea, guardarCategoria } from './acciones';
 import { Borrar, Campo, Flechas, Visible, cuenta } from './piezas';
 
 export const metadata = { title: 'Catálogo de productos' };
@@ -62,19 +61,6 @@ export default async function Catalogo({ params }: { params: Promise<{ empresa: 
   const categorias = (dCategorias ?? []) as Categoria[];
   const productos = dProductos ?? [];
 
-  /* La web es estática: lo editado aquí sale publicado en la siguiente
-     compilación. Si la empresa tiene configurada su dirección de
-     publicación, puede pedirla ella desde esta pantalla. */
-  const puedePublicar = Boolean(hookDe(empresa.id));
-  const { data: ultima } = puedePublicar
-    ? await sb
-        .from('publicaciones')
-        .select('creado, ok, detalle')
-        .eq('empresa_id', empresa.id)
-        .order('creado', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    : { data: null };
 
   const porCategoria = new Map<string, number>();
   for (const p of productos) porCategoria.set(p.categoria_id, (porCategoria.get(p.categoria_id) ?? 0) + 1);
@@ -92,37 +78,11 @@ export default async function Catalogo({ params }: { params: Promise<{ empresa: 
           <>
             El catálogo se publica en {cuenta(lineas.length, 'línea', 'líneas')},{' '}
             {cuenta(categorias.length, 'categoría', 'categorías')} y {cuenta(productos.length, 'producto')}. Los cambios
-            aparecen en la web en la siguiente publicación; lo que esté oculto se conserva pero no se muestra.
+            aparecen en la web al minuto, sin publicar nada; lo que esté oculto se conserva pero no se muestra.
           </>
         }
       />
 
-      {puedePublicar && (
-        <section className="caja mb-6 flex flex-wrap items-center justify-between gap-4 p-5" aria-labelledby="publicar">
-          <div className="min-w-0">
-            <h2 id="publicar" className="font-bold text-tinta">
-              Publicar en la web
-            </h2>
-            <p className="text-sm text-tinta-3">
-              {ultima
-                ? ultima.ok
-                  ? `Última publicación pedida el ${formatoFecha(ultima.creado)}.`
-                  : `El ${formatoFecha(ultima.creado)} no se pudo publicar: ${ultima.detalle}`
-                : 'Todavía no se ha publicado desde aquí.'}{' '}
-              Tarda un par de minutos; mientras tanto la web muestra el catálogo anterior.
-            </p>
-          </div>
-          <FormAccion accion={publicar} claseAviso="basis-full">
-            <input type="hidden" name="empresa" value={empresa.id} />
-            <BotonEnviar
-              pendiente="Pidiendo…"
-              confirmar="¿Publicar el catálogo en la web? Se compila el sitio con lo que hay ahora."
-            >
-              Publicar los cambios
-            </BotonEnviar>
-          </FormAccion>
-        </section>
-      )}
 
       {lineas.length === 0 ? (
         <Vacio titulo="Todavía no hay líneas" texto="Empiece por una línea: las categorías y los productos cuelgan de ella." />
