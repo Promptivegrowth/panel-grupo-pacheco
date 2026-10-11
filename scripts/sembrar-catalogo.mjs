@@ -70,7 +70,9 @@ async function rest(tabla, opciones = {}) {
 /* ── El catálogo y su traducción, leídos del repositorio de la web ──── */
 const mod = (rel) => import(pathToFileURL(path.join(web, rel)).href);
 
-const { lineas, categorias, productos } = await mod('src/data/catalogo.ts');
+/* La copia del repositorio, no `catalogo.ts`: ese modulo lee de la base, y
+   sembrar desde el seria copiar la base sobre si misma. */
+const { lineas, categorias, productos } = await mod('src/data/catalogo-local.ts');
 const { lineasEn, categoriasEnCat, productosEn, medidasEn, unidadesEn, caracteristicasEn } =
   await mod('src/i18n/productos-en.ts');
 const manifest = JSON.parse(await readFile(path.join(web, 'public/img/manifest.json'), 'utf8'));
