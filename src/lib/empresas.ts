@@ -46,7 +46,7 @@ export const EMPRESAS: Record<EmpresaUI['id'], EmpresaUI> = {
     prefijo: 'QM',
     bilingue: true,
     // Q-MEDICAL actualiza su portafolio una vez al ano: lo administra ella.
-    modulos: ['reclamos', 'mensajes', 'sitio', 'catalogo'],
+    modulos: ['reclamos', 'mensajes', 'sitio', 'catalogo', 'empleos', 'postulaciones'],
   },
   woli: {
     id: 'woli',
