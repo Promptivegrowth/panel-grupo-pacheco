@@ -135,9 +135,16 @@ export async function registrarPostulacion(
     throw new Error(`No se pudo guardar la postulación: ${error.message}`);
   }
 
-  const destino = vacante?.correo_postulacion ?? empresa.correo_contacto;
+  /* A quién se avisa. La vacante manda; una postulación espontánea no
+     cuelga de ninguna, así que va al correo de postulaciones de la empresa
+     —y, si no lo tiene puesto, al de contacto, que es como funcionaba—. */
+  const destinos = direcciones(
+    vacante?.correo_postulacion ?? empresa.correo_postulaciones ?? empresa.correo_contacto,
+  );
   const [aviso, acuse] = await Promise.all([
-    destino ? enviarAviso(empresa, fila, destino, cv) : Promise.resolve({ enviado: false as const, motivo: 'Sin correo de destino.' }),
+    destinos.length
+      ? enviarAviso(empresa, fila, destinos, cv)
+      : Promise.resolve({ enviado: false as const, motivo: 'Sin correo de destino.' }),
     enviarAcuse(empresa, fila),
   ]);
   const ahora = new Date().toISOString();
@@ -156,9 +163,21 @@ export async function registrarPostulacion(
 
 type FilaCorreo = NuevaPostulacion & { puesto: string; cv_nombre: string };
 
-function enviarAviso(empresa: Empresa, p: FilaCorreo, destino: string, cv: { bytes: Uint8Array; tipo: TipoCv }) {
+/**
+ * Varias direcciones en un solo campo, separadas por coma. Es lo que pidió
+ * Q-MEDICAL —recursos humanos y subgerencia— y evita una tabla aparte para
+ * guardar dos correos.
+ */
+function direcciones(valor: string | null | undefined): string[] {
+  return (valor ?? '')
+    .split(/[,;]/)
+    .map((x) => x.trim())
+    .filter((x) => x.includes('@'));
+}
+
+function enviarAviso(empresa: Empresa, p: FilaCorreo, destino: string[], cv: { bytes: Uint8Array; tipo: TipoCv }) {
   return enviarCorreo(empresa.id, {
-    para: [destino],
+    para: destino,
     responderA: p.correo,
     asunto: `Nueva postulación: ${p.puesto} · ${p.nombre}`,
     html: plantilla({

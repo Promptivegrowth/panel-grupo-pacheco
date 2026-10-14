@@ -137,17 +137,23 @@ export default async function EditarEmpleo({ params }: { params: Promise<{ empre
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="correo_postulacion" className="etiqueta">
-              Correo para postular
+              Correos para postular
             </label>
+            {/* Sin type="email": el navegador rechaza dos direcciones en un
+                campo de ese tipo, y aquí se admiten varias. */}
             <input
               id="correo_postulacion"
               name="correo_postulacion"
-              type="email"
+              type="text"
+              inputMode="email"
               defaultValue={e?.correo_postulacion ?? 'administracion@laboratoriospacheco.com'}
               className="campo"
               required
             />
-            <p className="mt-1 text-xs text-tinta-3">A este correo llega el aviso de cada postulación, con el CV adjunto.</p>
+            <p className="mt-1 text-xs text-tinta-3">
+              A estos correos llega el aviso de cada postulación, con el CV adjunto. Puede
+              indicar varios separados por coma.
+            </p>
           </div>
           <div>
             <label htmlFor="fecha_cierre" className="etiqueta">

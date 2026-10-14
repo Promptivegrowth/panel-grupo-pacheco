@@ -33,7 +33,28 @@ const esquema = z.object({
   requisitos: lineas(15),
   funciones: lineas(15),
   beneficios: lineas(12),
-  correo_postulacion: z.email('Correo de postulación no válido.').max(150),
+  /* Varias direcciones separadas por coma: Q-MEDICAL avisa a recursos
+     humanos y a subgerencia. Se valida una por una y se guardan
+     normalizadas, para que el envío no tenga que adivinar el formato. */
+  correo_postulacion: z
+    .string()
+    .trim()
+    .max(300)
+    .superRefine((valor, ctx) => {
+      const lista = valor.split(/[,;]/).map((x) => x.trim()).filter(Boolean);
+      if (!lista.length) {
+        ctx.addIssue({ code: 'custom', message: 'Indique al menos un correo de postulación.' });
+        return;
+      }
+      for (const correo of lista) {
+        if (!z.email().safeParse(correo).success) {
+          ctx.addIssue({ code: 'custom', message: `Correo de postulación no válido: ${correo}` });
+        }
+      }
+    })
+    .transform((valor) =>
+      valor.split(/[,;]/).map((x) => x.trim()).filter(Boolean).join(', '),
+    ),
   fecha_cierre: z
     .string()
     .trim()

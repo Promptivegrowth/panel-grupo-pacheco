@@ -15,6 +15,8 @@ export type Empresa = {
   sitio_url: string;
   correo_reclamos: string | null;
   correo_contacto: string | null;
+  /** Destino de las postulaciones espontáneas; en nulo se usa el de contacto. */
+  correo_postulaciones: string | null;
   origenes: string[];
 };
 
