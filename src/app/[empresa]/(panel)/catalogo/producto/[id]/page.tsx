@@ -19,6 +19,8 @@ type Presentacion = {
   unidad_en: string | null;
   caracteristicas: string[];
   caracteristicas_en: string[];
+  detalle: string | null;
+  detalle_en: string | null;
   descripcion: string | null;
   descripcion_en: string | null;
   registro_sanitario: string | null;
@@ -111,7 +113,7 @@ function CamposPresentacion({
           max={4000}
           area
           filas={8}
-          pista="Una por línea. Lo que esté antes del primer «:» se muestra como el nombre del dato."
+          pista="Una por línea. La web las muestra tal cual, en este orden y con sus viñetas."
         />
         {bilingue && (
           <Campo
@@ -124,6 +126,17 @@ function CamposPresentacion({
             filas={8}
             pista="El mismo número de líneas y en el mismo orden, o déjelo vacío."
           />
+        )}
+        <Campo
+          pref={pref}
+          nombre="detalle"
+          rotulo="Detalle"
+          valor={pr?.detalle}
+          max={200}
+          pista="El empaque: «Caja x 60 unidades». Va al final de la ficha. Vacío: no se publica, ni el rótulo."
+        />
+        {bilingue && (
+          <Campo pref={pref} nombre="detalle_en" rotulo="Detalle (inglés)" valor={pr?.detalle_en} max={200} />
         )}
         <Campo
           pref={pref}
@@ -180,7 +193,7 @@ export default async function ProductoCatalogo({
       .from('catalogo_presentaciones')
       // Todo en una sola cadena: el cliente lee la lista de columnas del
       // literal para tipar la respuesta, y partida en trozos no la reconoce.
-      .select('id, medida, medida_en, marca, marca_slug, unidad, unidad_en, caracteristicas, caracteristicas_en, descripcion, descripcion_en, registro_sanitario, normativa, imagen, orden, visible')
+      .select('id, medida, medida_en, marca, marca_slug, unidad, unidad_en, caracteristicas, caracteristicas_en, detalle, detalle_en, descripcion, descripcion_en, registro_sanitario, normativa, imagen, orden, visible')
       .eq('producto_id', p.id)
       .order('orden')
       .order('medida'),

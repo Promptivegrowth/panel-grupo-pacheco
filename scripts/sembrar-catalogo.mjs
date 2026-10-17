@@ -165,6 +165,8 @@ for (const [i, p] of productos.entries()) {
       // Línea a línea, como en la web: lo que no esté traducido se queda en
       // castellano al mostrarlo.
       caracteristicas_en: pr.caracteristicas.map((c) => caracteristicasEn[c] ?? c),
+      detalle: pr.detalle ?? null,
+      detalle_en: pr.detalle ? (caracteristicasEn[pr.detalle] ?? null) : null,
       descripcion: pr.descripcion ?? null,
       descripcion_en: t?.descripciones?.[j] ?? null,
       // La foto viaja como la ruta que ya tiene la web; al subir una nueva

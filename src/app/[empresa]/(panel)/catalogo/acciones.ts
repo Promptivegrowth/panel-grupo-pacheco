@@ -216,6 +216,8 @@ export async function guardarPresentacion(
     unidad_en: texto(60).parse(datos.get('unidad_en') ?? '') || null,
     caracteristicas,
     caracteristicas_en: caracteristicasEn,
+    detalle: texto(200).parse(datos.get('detalle') ?? '') || null,
+    detalle_en: texto(200).parse(datos.get('detalle_en') ?? '') || null,
     descripcion: texto(2000).parse(datos.get('descripcion') ?? '') || null,
     descripcion_en: texto(2000).parse(datos.get('descripcion_en') ?? '') || null,
     registro_sanitario: texto(120).parse(datos.get('registro_sanitario') ?? '') || null,
