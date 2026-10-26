@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { exigirAcceso } from '@/lib/sesion';
 import { supabaseServidor } from '@/lib/supabase/servidor';
+import { baseWeb } from '@/lib/web';
 import { fechaLima, aISO } from '@/lib/reclamos/plazos';
 import { Aviso, Cabecera, EnlaceBoton, Insignia, Vacio, formatoFecha } from '@/componentes/ui';
 import { FormAccion, BotonEnviar } from '@/componentes/formulario';
@@ -19,7 +20,7 @@ export default async function Empleos({
   const { creada, eliminada } = await searchParams;
   const verPostulaciones = modulos.includes('postulaciones');
   const sb = await supabaseServidor();
-  const [{ data: empleos }, { data: postulaciones }] = await Promise.all([
+  const [{ data: empleos }, { data: postulaciones }, { data: dEmpresa }] = await Promise.all([
     sb
       .from('empleos')
       .select('id, titulo, area, ubicacion, modalidad, jornada, publicado, fecha_publicacion, fecha_cierre, actualizado')
@@ -27,7 +28,10 @@ export default async function Empleos({
       .order('publicado', { ascending: false })
       .order('fecha_publicacion', { ascending: false }),
     sb.from('postulaciones').select('empleo_id, estado').eq('empresa_id', empresa.id).not('empleo_id', 'is', null),
+    sb.from('empresas').select('sitio_url').eq('id', empresa.id).maybeSingle(),
   ]);
+  // La web de cada empresa, no la de LP: Q-MEDICAL tiene su propia sección.
+  const vistaPublica = `${baseWeb(empresa.id, dEmpresa?.sitio_url)}/trabaja-con-nosotros`;
   // Postulaciones por vacante: total y nuevas.
   const conteo = new Map<string, { total: number; nuevas: number }>();
   for (const p of postulaciones ?? []) {
@@ -149,8 +153,8 @@ export default async function Empleos({
 
       <p className="mt-6 text-sm text-tinta-3">
         Vista pública:{' '}
-        <Link href="https://www.laboratoriospacheco.com/trabaja-con-nosotros" target="_blank" className="font-semibold text-marca hover:underline">
-          laboratoriospacheco.com/trabaja-con-nosotros ↗
+        <Link href={vistaPublica} target="_blank" className="font-semibold text-marca hover:underline">
+          {vistaPublica.replace(/^https?:\/\/(www\.)?/, '')} ↗
         </Link>
       </p>
     </>

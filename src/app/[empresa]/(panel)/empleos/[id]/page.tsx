@@ -50,12 +50,28 @@ export default async function EditarEmpleo({ params }: { params: Promise<{ empre
   const { empresa: empresaId, id } = await params;
   const { empresa } = await exigirAcceso(empresaId, 'empleos');
 
+  const sb = await supabaseServidor();
   let e: Empleo | null = null;
+  let correoPorDefecto = '';
   if (id !== 'nuevo') {
-    const sb = await supabaseServidor();
     const { data } = await sb.from('empleos').select('*').eq('id', id).eq('empresa_id', empresa.id).maybeSingle();
     if (!data) notFound();
     e = data as Empleo;
+  } else {
+    /* Una vacante nueva avisa a quien revisa los CV de esta empresa: el
+       destino de sus postulaciones, o el de su última vacante. Nunca a otra
+       empresa del grupo. */
+    const [{ data: dEmpresa }, { data: ultima }] = await Promise.all([
+      sb.from('empresas').select('correo_postulaciones, correo_contacto').eq('id', empresa.id).maybeSingle(),
+      sb
+        .from('empleos')
+        .select('correo_postulacion')
+        .eq('empresa_id', empresa.id)
+        .order('fecha_publicacion', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    correoPorDefecto = dEmpresa?.correo_postulaciones || ultima?.correo_postulacion || dEmpresa?.correo_contacto || '';
   }
 
   return (
@@ -146,7 +162,7 @@ export default async function EditarEmpleo({ params }: { params: Promise<{ empre
               name="correo_postulacion"
               type="text"
               inputMode="email"
-              defaultValue={e?.correo_postulacion ?? 'administracion@laboratoriospacheco.com'}
+              defaultValue={e?.correo_postulacion ?? correoPorDefecto}
               className="campo"
               required
             />
