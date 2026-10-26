@@ -281,7 +281,7 @@ export default async function DatosWeb({ params }: { params: Promise<{ empresa: 
         titulo="Datos de la web"
         descripcion={
           <>
-            Lo que cambie aquí aparece en la web al recargar la página, sin publicar de nuevo. Los datos ocultos se
+            Lo que cambie aquí aparece en la web en un minuto como máximo, sin publicar de nuevo. Los datos ocultos se
             conservan pero no se muestran.
           </>
         }
