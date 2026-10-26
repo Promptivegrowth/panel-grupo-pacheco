@@ -53,25 +53,28 @@ export default async function EditarEmpleo({ params }: { params: Promise<{ empre
   const sb = await supabaseServidor();
   let e: Empleo | null = null;
   let correoPorDefecto = '';
+  let ubicacionPorDefecto = '';
   if (id !== 'nuevo') {
     const { data } = await sb.from('empleos').select('*').eq('id', id).eq('empresa_id', empresa.id).maybeSingle();
     if (!data) notFound();
     e = data as Empleo;
   } else {
-    /* Una vacante nueva avisa a quien revisa los CV de esta empresa: el
-       destino de sus postulaciones, o el de su última vacante. Nunca a otra
+    /* Una vacante nueva parte de los datos de esta empresa: avisa a quien
+       revisa sus CV (el destino de sus postulaciones, o el de su última
+       vacante) y propone el lugar de su última vacante. Nunca los de otra
        empresa del grupo. */
     const [{ data: dEmpresa }, { data: ultima }] = await Promise.all([
       sb.from('empresas').select('correo_postulaciones, correo_contacto').eq('id', empresa.id).maybeSingle(),
       sb
         .from('empleos')
-        .select('correo_postulacion')
+        .select('correo_postulacion, ubicacion')
         .eq('empresa_id', empresa.id)
         .order('fecha_publicacion', { ascending: false })
         .limit(1)
         .maybeSingle(),
     ]);
     correoPorDefecto = dEmpresa?.correo_postulaciones || ultima?.correo_postulacion || dEmpresa?.correo_contacto || '';
+    ubicacionPorDefecto = ultima?.ubicacion ?? '';
   }
 
   return (
@@ -98,13 +101,13 @@ export default async function EditarEmpleo({ params }: { params: Promise<{ empre
             <label htmlFor="area" className="etiqueta">
               Área
             </label>
-            <input id="area" name="area" defaultValue={e?.area ?? ''} className="campo" maxLength={80} placeholder="Producción" />
+            <input id="area" name="area" defaultValue={e?.area ?? ''} className="campo" maxLength={80} placeholder="Área del puesto" />
           </div>
           <div>
             <label htmlFor="ubicacion" className="etiqueta">
               Ubicación
             </label>
-            <input id="ubicacion" name="ubicacion" defaultValue={e?.ubicacion ?? 'Callao'} className="campo" maxLength={80} />
+            <input id="ubicacion" name="ubicacion" defaultValue={e?.ubicacion ?? ubicacionPorDefecto} className="campo" maxLength={80} />
           </div>
           <div>
             <label htmlFor="modalidad" className="etiqueta">
@@ -140,7 +143,7 @@ export default async function EditarEmpleo({ params }: { params: Promise<{ empre
           <label htmlFor="reporta_a" className="etiqueta">
             Reporta a
           </label>
-          <input id="reporta_a" name="reporta_a" defaultValue={e?.reporta_a ?? ''} className="campo" maxLength={120} placeholder="Jefe de Producción" />
+          <input id="reporta_a" name="reporta_a" defaultValue={e?.reporta_a ?? ''} className="campo" maxLength={120} placeholder="Cargo del jefe directo" />
           <p className="mt-1 text-xs text-tinta-3">Opcional. Según el MOF del puesto.</p>
         </div>
 
